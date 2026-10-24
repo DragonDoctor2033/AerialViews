@@ -2,12 +2,10 @@ package com.neilturner.aerialviews.services.weather
 
 import android.content.Context
 import android.os.Bundle
-import com.neilturner.aerialviews.BuildConfig
 import com.neilturner.aerialviews.data.network.JsonHelper.buildSerializer
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
 import com.neilturner.aerialviews.services.weather.NetworkHelpers.buildOkHttpClient
 import com.neilturner.aerialviews.utils.FirebaseHelper
-import com.neilturner.aerialviews.utils.capitalise
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,18 +16,16 @@ import me.kosert.flowbus.GlobalBus
 import retrofit2.Retrofit
 import timber.log.Timber
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
-import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class WeatherService(
     val context: Context,
-    private val apiOverride: OpenWeatherApi? = null,
+    private val apiOverride: OpenMeteoApi? = null,
 ) {
     private var updateJob: Job? = null
     private val maxRetries = 3
@@ -41,33 +37,30 @@ class WeatherService(
     private val rateLimitDelay = 1.minutes // Delay for rate limiting
     private val retryDelay = 30.seconds // Delay before retrying after an error
 
-    private val openWeatherClient by lazy {
+    private val openMeteoClient by lazy {
         apiOverride
             ?: Retrofit
                 .Builder()
-                .baseUrl("https://api.openweathermap.org/")
+                .baseUrl("https://api.open-meteo.com/")
                 .client(buildOkHttpClient(context))
                 .addConverterFactory(buildSerializer())
                 .build()
-                .create(OpenWeatherApi::class.java)
+                .create(OpenMeteoApi::class.java)
     }
 
     suspend fun lookupLocation(query: String): List<LocationResponse> =
         try {
-            val key = BuildConfig.OPEN_WEATHER
             val language = WeatherLanguage.getLanguageCode(context)
-            val response = openWeatherClient.getLocationByName(query, 10, key, language)
+            val response = openMeteoClient.searchLocation(query, 10, language)
             delay(lookupDelay)
 
             when {
                 response.isSuccessful -> {
-                    response.body() ?: emptyList()
-                }
-
-                response.code() == 401 -> {
-                    Timber.e("Unauthorized access to weather API - invalid API key")
-                    delay(errorDelay)
-                    emptyList()
+                    response
+                        .body()
+                        ?.results
+                        .orEmpty()
+                        .map { it.toLocationResponse() }
                 }
 
                 response.code() in 500..599 -> {
@@ -84,45 +77,6 @@ class WeatherService(
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to fetch location data")
-            delay(errorDelay)
-            emptyList()
-        }
-
-    suspend fun lookupLocationByCoordinates(
-        lat: Double,
-        lon: Double,
-    ): List<LocationResponse> =
-        try {
-            val key = BuildConfig.OPEN_WEATHER
-            val language = WeatherLanguage.getLanguageCode(context)
-            val response = openWeatherClient.getLocationByCoordinates(lat, lon, 5, key, language)
-            delay(lookupDelay)
-
-            when {
-                response.isSuccessful -> {
-                    response.body() ?: emptyList()
-                }
-
-                response.code() == 401 -> {
-                    Timber.e("Unauthorized access to weather API - invalid API key")
-                    delay(errorDelay)
-                    emptyList()
-                }
-
-                response.code() in 500..599 -> {
-                    Timber.e("Server error (${response.code()}) while fetching location data")
-                    delay(errorDelay)
-                    emptyList()
-                }
-
-                else -> {
-                    Timber.e("Failed to fetch location data - HTTP ${response.code()}: ${response.message()}")
-                    delay(errorDelay)
-                    emptyList()
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to fetch location data by coordinates")
             delay(errorDelay)
             emptyList()
         }
@@ -164,16 +118,9 @@ class WeatherService(
     }
 
     internal fun buildRequestConfig(): WeatherRequestConfig? {
-        val key = BuildConfig.OPEN_WEATHER
         val lat = GeneralPrefs.weatherLocationLat.toDoubleOrNull()
         val lon = GeneralPrefs.weatherLocationLon.toDoubleOrNull()
-        val units = GeneralPrefs.weatherTemperatureUnits?.toString()?.lowercase() ?: "metric"
-        val language = WeatherLanguage.getLanguageCode(context)
-
-        if (key.isEmpty()) {
-            Timber.e("OpenWeather API key is missing")
-            return null
-        }
+        val imperial = GeneralPrefs.weatherTemperatureUnits == TemperatureUnit.IMPERIAL
 
         if (lat == null || lon == null) {
             Timber.e("Invalid location coordinates")
@@ -181,66 +128,62 @@ class WeatherService(
         }
 
         return WeatherRequestConfig(
-            apiKey = key,
             lat = lat,
             lon = lon,
-            units = units,
-            language = language,
+            temperatureUnit = if (imperial) "fahrenheit" else "celsius",
+            windSpeedUnit = if (imperial) "mph" else "kmh",
         )
     }
 
-    internal fun buildDisplayConfig(): WeatherDisplayConfig =
-        WeatherDisplayConfig(
-            currentWeatherCity = GeneralPrefs.weatherLocationCustomName,
-            forecastCity = GeneralPrefs.weatherLocationCustomName,
+    internal fun buildDisplayConfig(): WeatherDisplayConfig {
+        // Open-Meteo forecasts carry no place name, so fall back to the city part of the saved location
+        val city =
+            GeneralPrefs.weatherLocationCustomName.ifEmpty {
+                GeneralPrefs.weatherLocationName.substringBefore(",").trim()
+            }
+
+        return WeatherDisplayConfig(
+            currentWeatherCity = city,
+            forecastCity = city,
             forecastDays = GeneralPrefs.weatherLine2Days.toIntOrNull() ?: 3,
         )
+    }
 
     internal suspend fun fetchWeatherData(
         requests: WeatherRequests,
         config: WeatherRequestConfig,
         displayConfig: WeatherDisplayConfig,
     ): WeatherResult {
-        var weatherEvent: WeatherEvent? = null
-        var forecastEvent: ForecastEvent? = null
-
-        if (requests.fetchCurrentWeather) {
-            val response =
-                fetchCurrentWeatherResponse(
-                    config = config,
-                    attempt = 0,
-                )
-            weatherEvent =
-                response?.let {
-                    mapCurrentWeatherResponse(
-                        response = it,
-                        city = displayConfig.currentWeatherCity.ifEmpty { it.name },
-                    )
-                }
+        if (!requests.fetchCurrentWeather && !requests.fetchForecast) {
+            return WeatherResult()
         }
 
-        if (requests.fetchForecast) {
-            val response =
-                fetchForecastResponse(
-                    config = config,
-                    attempt = 0,
-                )
-            forecastEvent =
-                response?.let {
-                    val timezoneOffset = it.city.timezone.toLong()
-                    val today =
-                        ZonedDateTime
-                            .now(ZoneId.ofOffset("UTC", java.time.ZoneOffset.ofTotalSeconds(timezoneOffset.toInt())))
-                            .toLocalDate()
+        val response =
+            fetchForecastResponse(
+                config = config,
+                requests = requests,
+                forecastDays = displayConfig.forecastDays,
+                attempt = 0,
+            )
 
-                    mapForecastResponse(
-                        response = it,
-                        today = today,
-                        city = displayConfig.forecastCity.ifEmpty { it.city.name },
-                        maxDays = displayConfig.forecastDays,
-                    )
-                }
-        }
+        val weatherEvent =
+            response?.current?.takeIf { requests.fetchCurrentWeather }?.let {
+                mapCurrentConditions(
+                    current = it,
+                    windSpeedUnit = config.windSpeedUnit,
+                    city = displayConfig.currentWeatherCity,
+                )
+            }
+
+        val forecastEvent =
+            response?.daily?.takeIf { requests.fetchForecast }?.let {
+                mapDailyForecast(
+                    daily = it,
+                    utcOffsetSeconds = response.utcOffsetSeconds,
+                    city = displayConfig.forecastCity,
+                    maxDays = displayConfig.forecastDays,
+                )
+            }
 
         if (weatherEvent != null || forecastEvent != null) {
             totalUpdates++
@@ -252,90 +195,22 @@ class WeatherService(
         )
     }
 
-    private suspend fun fetchCurrentWeatherResponse(
-        config: WeatherRequestConfig,
-        attempt: Int,
-    ): CurrentWeatherResponse? =
-        try {
-            val response =
-                openWeatherClient.getCurrentWeather(
-                    lat = config.lat,
-                    lon = config.lon,
-                    apiKey = config.apiKey,
-                    units = config.units,
-                    language = config.language,
-                )
-
-            when {
-                response.isSuccessful -> {
-                    response.body().also { body ->
-                        if (body == null) {
-                            Timber.e("Received successful current weather response but body was null")
-                        }
-                    }
-                }
-
-                response.code() == 401 -> {
-                    val error = "Unauthorized access to current weather API - cancelling weather updates"
-                    Timber.e(error)
-                    stop()
-                    FirebaseHelper.crashlyticsLogMessage(error)
-                    null
-                }
-
-                response.code() in 500..599 -> {
-                    Timber.w("Current weather server error (${response.code()}) - attempt ${attempt + 1}/$maxRetries")
-                    retryCurrentWeather(config, attempt)
-                }
-
-                response.code() == 429 -> {
-                    val error = "Current weather rate limit exceeded - backing off"
-                    Timber.w(error)
-                    FirebaseHelper.crashlyticsLogMessage(error)
-                    delay(rateLimitDelay)
-                    null
-                }
-
-                else -> {
-                    val error = "Failed to fetch current weather - HTTP ${response.code()}: ${response.message()}"
-                    Timber.e(error)
-                    FirebaseHelper.crashlyticsLogMessage(error)
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to fetch and parse current weather data")
-            FirebaseHelper.crashlyticsException(e)
-            null
-        }
-
-    private suspend fun retryCurrentWeather(
-        config: WeatherRequestConfig,
-        attempt: Int,
-    ): CurrentWeatherResponse? {
-        if (attempt >= maxRetries) {
-            val error = "Max retries reached for current weather server errors - giving up"
-            Timber.e(error)
-            FirebaseHelper.crashlyticsLogMessage(error)
-            return null
-        }
-
-        delay(retryDelay)
-        return fetchCurrentWeatherResponse(config, attempt + 1)
-    }
-
     private suspend fun fetchForecastResponse(
         config: WeatherRequestConfig,
+        requests: WeatherRequests,
+        forecastDays: Int,
         attempt: Int,
-    ): FiveDayForecastResponse? =
+    ): ForecastResponse? =
         try {
             val response =
-                openWeatherClient.getForecast(
+                openMeteoClient.getForecast(
                     lat = config.lat,
                     lon = config.lon,
-                    apiKey = config.apiKey,
-                    units = config.units,
-                    language = config.language,
+                    current = CURRENT_FIELDS.takeIf { requests.fetchCurrentWeather },
+                    daily = DAILY_FIELDS.takeIf { requests.fetchForecast },
+                    forecastDays = forecastDays.takeIf { requests.fetchForecast },
+                    temperatureUnit = config.temperatureUnit,
+                    windSpeedUnit = config.windSpeedUnit,
                 )
 
             when {
@@ -347,17 +222,9 @@ class WeatherService(
                     }
                 }
 
-                response.code() == 401 -> {
-                    val error = "Unauthorized access to forecast API - cancelling weather updates"
-                    Timber.e(error)
-                    stop()
-                    FirebaseHelper.crashlyticsLogMessage(error)
-                    null
-                }
-
                 response.code() in 500..599 -> {
                     Timber.w("Forecast server error (${response.code()}) - attempt ${attempt + 1}/$maxRetries")
-                    retryForecast(config, attempt)
+                    retryForecast(config, requests, forecastDays, attempt)
                 }
 
                 response.code() == 429 -> {
@@ -383,8 +250,10 @@ class WeatherService(
 
     private suspend fun retryForecast(
         config: WeatherRequestConfig,
+        requests: WeatherRequests,
+        forecastDays: Int,
         attempt: Int,
-    ): FiveDayForecastResponse? {
+    ): ForecastResponse? {
         if (attempt >= maxRetries) {
             val error = "Max retries reached for forecast server errors - giving up"
             Timber.e(error)
@@ -393,80 +262,55 @@ class WeatherService(
         }
 
         delay(retryDelay)
-        return fetchForecastResponse(config, attempt + 1)
+        return fetchForecastResponse(config, requests, forecastDays, attempt + 1)
     }
 
-    internal fun mapCurrentWeatherResponse(
-        response: CurrentWeatherResponse,
+    internal fun mapCurrentConditions(
+        current: CurrentConditions,
+        windSpeedUnit: String,
         city: String,
     ): WeatherEvent {
-        val weatherInfo = response.weather.firstOrNull() ?: return WeatherEvent()
-        val wind = round(response.wind.speed)
+        val temperature = current.temperature ?: return WeatherEvent()
+        val code = current.weatherCode ?: -1
+        val windLabel = if (windSpeedUnit == "mph") "mph" else "km/h"
 
         return WeatherEvent(
-            temperature = "${response.main.temp.roundToInt()}°",
-            icon = getWeatherIcon(weatherInfo.id, weatherInfo.main, weatherInfo.icon),
-            summary = weatherInfo.description.capitalise(),
+            temperature = "${temperature.roundToInt()}°",
+            icon = WeatherCodes.getWeatherIcon(code, isDay = current.isDay != 0),
+            summary = WeatherCodes.getSummary(code)?.let { context.getString(it) }.orEmpty(),
             city = city,
-            wind = "$wind km/h",
-            humidity = "${response.main.humidity}%",
+            wind = current.windSpeed?.let { "${it.roundToInt()} $windLabel" }.orEmpty(),
+            humidity = current.humidity?.let { "$it%" }.orEmpty(),
         )
     }
 
-    internal fun mapForecastResponse(
-        response: FiveDayForecastResponse,
-        today: java.time.LocalDate,
+    internal fun mapDailyForecast(
+        daily: DailyForecast,
+        utcOffsetSeconds: Int,
         city: String,
         maxDays: Int,
     ): ForecastEvent {
-        val timezoneOffset = response.city.timezone.toLong()
-        val forecastDays = aggregateForecastByDay(response.list, today, timezoneOffset)
-        val limitedDays = forecastDays.take(maxDays)
+        val zoneOffset = ZoneOffset.ofTotalSeconds(utcOffsetSeconds)
 
-        Timber.i("Processed forecast: ${limitedDays.size} days for ${response.city.name}")
-        return ForecastEvent(days = limitedDays, city = city)
+        val days =
+            daily.time
+                .mapIndexedNotNull { index, time ->
+                    val tempHigh = daily.temperatureMax.getOrNull(index) ?: return@mapIndexedNotNull null
+                    val tempLow = daily.temperatureMin.getOrNull(index) ?: return@mapIndexedNotNull null
+                    val code = daily.weatherCode.getOrNull(index) ?: -1
+                    val date = Instant.ofEpochSecond(time).atOffset(zoneOffset).toLocalDate()
+
+                    ForecastDay(
+                        dayName = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                        icon = WeatherCodes.getWeatherIcon(code, isDay = true),
+                        tempHigh = "${tempHigh.roundToInt()}°",
+                        tempLow = "${tempLow.roundToInt()}°",
+                    )
+                }.take(maxDays)
+
+        Timber.i("Processed forecast: ${days.size} days for $city")
+        return ForecastEvent(days = days, city = city)
     }
-
-    private fun aggregateForecastByDay(
-        items: List<ForecastItem>,
-        today: java.time.LocalDate,
-        timezoneOffset: Long,
-    ): List<ForecastDay> {
-        val zoneOffset = java.time.ZoneOffset.ofTotalSeconds(timezoneOffset.toInt())
-
-        return items
-            .groupBy { item ->
-                Instant.ofEpochSecond(item.dt).atOffset(zoneOffset).toLocalDate()
-            }.filterKeys { !it.isBefore(today) }
-            .toSortedMap()
-            .map { (date, dayItems) ->
-                val tempHigh = dayItems.maxOf { it.main.tempMax }.roundToInt()
-                val tempLow = dayItems.minOf { it.main.tempMin }.roundToInt()
-
-                val middayItem =
-                    dayItems.minByOrNull { item ->
-                        val hour = Instant.ofEpochSecond(item.dt).atOffset(zoneOffset).hour
-                        kotlin.math.abs(hour - 12)
-                    } ?: dayItems.first()
-
-                val weatherInfo = middayItem.weather.first()
-                val icon = getWeatherIcon(weatherInfo.id, weatherInfo.main, weatherInfo.icon)
-                val dayName = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-
-                ForecastDay(
-                    dayName = dayName,
-                    icon = icon,
-                    tempHigh = "$tempHigh°",
-                    tempLow = "$tempLow°",
-                )
-            }
-    }
-
-    fun getWeatherIcon(
-        code: Int,
-        type: String,
-        icon: String,
-    ): Int = WeatherIcons.getWeatherIcon(code, type, icon)
 
     fun stop() {
         updateJob?.cancel()
@@ -478,6 +322,11 @@ class WeatherService(
             },
         )
         Timber.i("Weather updates stopped, total updates for session: $totalUpdates")
+    }
+
+    companion object {
+        internal const val CURRENT_FIELDS = "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day"
+        internal const val DAILY_FIELDS = "weather_code,temperature_2m_max,temperature_2m_min"
     }
 }
 
@@ -513,11 +362,10 @@ data class WeatherRequests(
 )
 
 data class WeatherRequestConfig(
-    val apiKey: String,
     val lat: Double,
     val lon: Double,
-    val units: String,
-    val language: String,
+    val temperatureUnit: String,
+    val windSpeedUnit: String,
 )
 
 data class WeatherDisplayConfig(
