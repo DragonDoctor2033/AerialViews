@@ -11,6 +11,7 @@ import com.neilturner.aerialviews.models.prefs.WebDavProviderPreferences
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.providers.MediaProvider
 import com.neilturner.aerialviews.providers.ProviderFetchResult
+import com.neilturner.aerialviews.utils.MediaTagParser
 import com.neilturner.aerialviews.utils.aerialMediaTypeFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -88,6 +89,8 @@ internal class WebDavMediaProvider(
                         AerialMedia(uri, type = type).apply {
                             source = AerialMediaSource.WEBDAV
                             metadata.title = displayName?.takeIf { it.isNotBlank() }.orEmpty()
+                            // The url without the login, so only the folder and file names are tags
+                            MediaTagParser.applyPathTags(metadata, url)
                         }
                     }
 

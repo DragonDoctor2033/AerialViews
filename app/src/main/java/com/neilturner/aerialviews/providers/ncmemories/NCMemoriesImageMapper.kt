@@ -3,15 +3,16 @@ package com.neilturner.aerialviews.providers.ncmemories
 import com.neilturner.aerialviews.data.storage.FileHelper
 import com.neilturner.aerialviews.models.enums.AerialMediaSource
 import com.neilturner.aerialviews.models.enums.AerialMediaType
-import com.neilturner.aerialviews.models.prefs.NCMemoriesMediaPrefs
+import com.neilturner.aerialviews.models.prefs.NCMemoriesImagePrefs
 import com.neilturner.aerialviews.models.videos.AerialExifMetadata
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.models.videos.AerialMediaMetadata
+import com.neilturner.aerialviews.utils.MediaTagParser
 import timber.log.Timber
 import kotlin.time.Instant
 
 class NCMemoriesImageMapper(
-    private val prefs: NCMemoriesMediaPrefs,
+    private val prefs: NCMemoriesImagePrefs,
     private val urlBuilder: NCMemoriesUrlBuilder,
 ) {
     data class ProcessResults(
@@ -65,6 +66,8 @@ class NCMemoriesImageMapper(
                     ).apply {
                         source = AerialMediaSource.NCMEMORIES
                         type = if (isVideo) AerialMediaType.VIDEO else AerialMediaType.IMAGE
+                        // The uri only holds a file id, the folder and file names are in the file's path
+                        MediaTagParser.applyPathTags(metadata, image.fileName ?: filename)
                     }
 
                 if (isVideo) {

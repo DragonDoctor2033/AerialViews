@@ -5,6 +5,7 @@ import com.neilturner.aerialviews.models.enums.AerialMediaSource
 import com.neilturner.aerialviews.models.enums.AerialMediaType
 import com.neilturner.aerialviews.models.enums.SceneType
 import com.neilturner.aerialviews.models.enums.TimeOfDay
+import com.neilturner.aerialviews.models.enums.WeatherCondition
 
 data class AerialMedia(
     val uri: Uri,
@@ -22,6 +23,8 @@ data class AerialMediaMetadata(
     var exif: AerialExifMetadata = AerialExifMetadata(),
     var albumName: String = "",
     var title: String = "",
+    // The weather this media is tagged for. Empty means untagged.
+    var weather: Set<WeatherCondition> = emptySet(),
 )
 
 data class AerialExifMetadata(
