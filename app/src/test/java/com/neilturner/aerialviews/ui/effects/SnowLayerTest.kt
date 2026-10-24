@@ -211,7 +211,7 @@ internal class SnowLayerTest {
         // Blown by the wind for half a minute, a good many widths of the screen
         repeat(300) { layer.step(0.1f, 1f, 0.5f, 200) }
 
-        val margin = 80f
+        val margin = 120f
         (0 until layer.count).forEach { i ->
             assertTrue(layer.baseX(i) in -margin - 1f..width + margin + 1f, "flake $i is at ${layer.baseX(i)}")
         }
@@ -362,5 +362,74 @@ internal class SnowLayerTest {
         assertTrue(shares[0] > shares[1] && shares[1] > shares[2])
         assertEquals(3, SnowProfiles.ALL.size)
         assertEquals(SnowProfiles.NEAR.alpha, layer(profile = SnowProfiles.NEAR).alpha)
+    }
+
+    @Test
+    fun `the near flakes are big enough to be seen from the sofa, two to three times what they were`() {
+        // They were 24 px at 1080p. A flake of 56 px is 5 percent of the height of the screen
+        val near = SnowProfiles.NEAR
+
+        assertEquals(56f, near.diameterPx)
+        assertTrue(near.diameterPx in 2f * 24f..3f * 24f)
+        val full = layer(profile = near)
+        full.populate(40)
+        assertTrue((0 until 40).all { full.diameterPx(it) in 44f..74f }, "from ${full.diameterPx(0)}")
+        // On a screen of 4K they are twice as big in pixels, and as big on the screen
+        val big = SnowLayer(200, near, Random(11)).also { it.resize(3840f, 2160f) }
+        big.populate(40)
+        assertEquals(2f, big.diameterPx(5) / full.diameterPx(5), 0.001f)
+    }
+
+    @Test
+    fun `the near and the middle flakes are bright, and the far ones are only a fine texture`() {
+        assertEquals(0.9f, SnowProfiles.NEAR.alpha)
+        assertTrue(SnowProfiles.MIDDLE.alpha in 0.75f..0.85f)
+        assertTrue(SnowProfiles.FAR.diameterPx <= 12f)
+        assertTrue(SnowProfiles.FAR.alpha <= 0.6f)
+        assertTrue(SnowProfiles.MIDDLE.diameterPx in 20f..32f)
+    }
+
+    @Test
+    fun `a flake which comes back is out of sight, with its sway and the biggest of its size`() {
+        for (profile in SnowProfiles.ALL) {
+            val biggest = layer(profile = profile).biggestDiameterPx
+            // The margin at the sides is 120 px, at 1080p
+            assertTrue(biggest / 2f + profile.swayPx * 1.2f < 120f, "$profile")
+        }
+    }
+
+    // The sprite of a flake
+
+    @Test
+    fun `a flake is solid in the middle and clear at the edge`() {
+        assertEquals(255, SnowSprite.alphaAt(0f))
+        assertEquals(SnowSprite.BODY_ALPHA, SnowSprite.alphaAt(SnowSprite.BODY_END))
+        assertEquals(0, SnowSprite.alphaAt(1f))
+        assertTrue(SnowSprite.BODY_ALPHA >= 225, "nearly as solid as the middle")
+        assertEquals(0.5f, SnowSprite.BODY_END)
+    }
+
+    @Test
+    fun `a flake only gets clearer from the middle to the edge`() {
+        var previous = 256
+        for (step in 0..100) {
+            val alpha = SnowSprite.alphaAt(step / 100f)
+            assertTrue(alpha <= previous, "at $step")
+            previous = alpha
+        }
+    }
+
+    @Test
+    fun `the half way to the edge of the soft part is half of the solid part`() {
+        val half = (SnowSprite.BODY_END + 1f) / 2f
+
+        assertEquals(SnowSprite.BODY_ALPHA / 2f, SnowSprite.alphaAt(half).toFloat(), 1f)
+    }
+
+    @Test
+    fun `beyond the sprite is clear air`() {
+        assertEquals(0, SnowSprite.alphaAt(2f))
+        assertEquals(255, SnowSprite.alphaAt(-1f))
+        assertEquals(255, SnowSprite.alphaAt(Float.NaN))
     }
 }

@@ -317,14 +317,15 @@ class WeatherEffectsView
             val opacity = mix.snow.opacity * gateOpacity
             if (opacity <= 0f) return
 
-            val strength = opacity * (SNOW_ALPHA_BASE + SNOW_ALPHA_SHARE * mix.snow.level) * EffectPalette.snowDim(night)
+            val level = mix.snow.level
             val w = width.toFloat()
             val h = height.toFloat()
             for (l in layers.indices) {
                 val layer = layers[l]
                 if (layer.count == 0) continue
                 val sprite = sprites[l]
-                snowPaint.alpha = EffectMath.toByte(layer.alpha * strength)
+                // Lighter snow is fainter, and by night it is a little dimmer
+                snowPaint.alpha = EffectMath.toByte(EffectPalette.snowAlpha(layer.alpha, level, opacity, night))
                 for (i in 0 until layer.count) {
                     val half = layer.diameterPx(i) / 2f
                     val x = layer.centreX(i)
@@ -548,7 +549,7 @@ class WeatherEffectsView
                                 radius,
                                 radius,
                                 intArrayOf(FLAKE_CENTRE, FLAKE_BODY, FLAKE_EDGE),
-                                floatArrayOf(0f, FLAKE_BODY_END, 1f),
+                                floatArrayOf(0f, SnowSprite.BODY_END, 1f),
                                 Shader.TileMode.CLAMP,
                             )
                     }
@@ -604,11 +605,9 @@ class WeatherEffectsView
             const val NANOS_PER_MILLI = 1_000_000L
             const val MILLIS_PER_SECOND = 1_000f
 
-            // Lighter rain and snow are fainter: a base and a share of the intensity
+            // Lighter rain is fainter: a base and a share of the intensity
             const val RAIN_ALPHA_BASE = 0.55f
             const val RAIN_ALPHA_SHARE = 0.45f
-            const val SNOW_ALPHA_BASE = 0.70f
-            const val SNOW_ALPHA_SHARE = 0.30f
 
             // A flash is as bright as this much of the most, with the lightest rain, and the most with the heaviest
             const val FLASH_BASE = 0.6f
@@ -617,11 +616,10 @@ class WeatherEffectsView
             // The night fades the fog's light in this many steps
             const val FOG_LIGHT_STEPS = 32f
 
-            // A flake: solid in the middle, softer towards the edge and clear at the very edge
+            // A flake: solid in the middle, softer towards the edge and clear at the very edge, see SnowSprite
             const val MIN_SPRITE_PX = 4
-            const val FLAKE_BODY_END = 0.45f
-            val FLAKE_CENTRE = EffectMath.argb(255, 255, 255, 255)
-            val FLAKE_BODY = EffectMath.argb(190, 255, 255, 255)
+            val FLAKE_CENTRE = EffectMath.argb(SnowSprite.CENTRE_ALPHA, 255, 255, 255)
+            val FLAKE_BODY = EffectMath.argb(SnowSprite.BODY_ALPHA, 255, 255, 255)
             val FLAKE_EDGE = EffectMath.argb(0, 255, 255, 255)
         }
     }

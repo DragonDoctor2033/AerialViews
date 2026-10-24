@@ -94,11 +94,42 @@ internal class EffectPaletteTest {
     }
 
     @Test
-    fun `the particles are dimmed more than the tone, which is dark already`() {
+    fun `the rain is dimmed more than the tone, which is dark already`() {
         assertTrue(EffectPalette.rainDim(1f) < EffectPalette.tintDim(1f) + 0.2f)
         assertEquals(0.55f, EffectPalette.rainDim(1f), 0.0001f)
-        assertEquals(0.6f, EffectPalette.snowDim(1f), 0.0001f)
         assertEquals(0.6f, EffectPalette.tintDim(1f), 0.0001f)
+    }
+
+    @Test
+    fun `snow is only a little dimmer by night, so that it is still clearly seen`() {
+        assertEquals(0.8f, EffectPalette.snowDim(1f), 0.0001f)
+        assertTrue(EffectPalette.snowDim(1f) > EffectPalette.rainDim(1f))
+        assertTrue(EffectPalette.snowDim(1f) > EffectPalette.tintDim(1f))
+    }
+
+    // Snow
+
+    @Test
+    fun `the opacity of snow is its layer, a base and a share of the intensity, the fade and the night`() {
+        // The layer comes first, then the intensity gives from 85 percent of it to all of it
+        assertEquals(0.9f * 0.85f, EffectPalette.snowAlpha(0.9f, 0f, 1f, 0f), 0.0001f)
+        assertEquals(0.9f, EffectPalette.snowAlpha(0.9f, 1f, 1f, 0f), 0.0001f)
+        assertEquals(0.9f * 0.94f, EffectPalette.snowAlpha(0.9f, 0.6f, 1f, 0f), 0.0001f)
+        // The fade of the layer in and out is a plain factor, and the night is a fifth less
+        assertEquals(0f, EffectPalette.snowAlpha(0.9f, 1f, 0f, 0f))
+        assertEquals(0.45f, EffectPalette.snowAlpha(0.9f, 1f, 0.5f, 0f), 0.0001f)
+        assertEquals(0.9f * 0.8f, EffectPalette.snowAlpha(0.9f, 1f, 1f, 1f), 0.0001f)
+    }
+
+    @Test
+    fun `the near flakes of a typical snowfall are nearly solid, by day and by night`() {
+        val level = 0.6f
+        val near = SnowProfiles.NEAR.alpha
+
+        assertTrue(EffectPalette.snowAlpha(near, level, 1f, 0f) in 0.82f..0.9f)
+        assertTrue(EffectPalette.snowAlpha(near, level, 1f, 1f) in 0.65f..0.72f)
+        // And the middle ones are well seen
+        assertTrue(EffectPalette.snowAlpha(SnowProfiles.MIDDLE.alpha, level, 1f, 1f) > 0.55f)
     }
 
     @Test

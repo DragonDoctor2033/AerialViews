@@ -28,11 +28,17 @@ object EffectPalette {
     private const val NIGHT_VEIL_DIM = 0.3f
     private const val NIGHT_FOG_DIM = 0.5f
     private const val NIGHT_RAIN_DIM = 0.45f
-    private const val NIGHT_SNOW_DIM = 0.4f
+
+    // Snow is only a little dimmer by night, as it has to stay clearly seen
+    private const val NIGHT_SNOW_DIM = 0.2f
 
     // The lowest brightness the fog gets to by night, in 0 to 255, as the colour of the fog is
     // multiplied by it
     private const val NIGHT_FOG_LIGHT = 72
+
+    // Lighter snow is fainter: a base and a share of the intensity
+    private const val SNOW_ALPHA_BASE = 0.85f
+    private const val SNOW_ALPHA_SHARE = 0.15f
 
     // Colours by day and by night: red, green and blue
     private val TINT_DAY = intArrayOf(78, 90, 108)
@@ -88,6 +94,20 @@ object EffectPalette {
         val level = EffectMath.mixChannel(255, NIGHT_FOG_LIGHT, night)
         return EffectMath.argb(255, level, level, level)
     }
+
+    /**
+     * How opaque the flakes of a layer of snow are, with everything in it which is not the colour
+     *
+     * @param layerAlpha the opacity of the layer, see [SnowProfile]
+     * @param level the intensity of the snow, from 0 to 1
+     * @param opacity how much of the snow is there, as it fades in and out, from 0 to 1
+     */
+    fun snowAlpha(
+        layerAlpha: Float,
+        level: Float,
+        opacity: Float,
+        night: Float,
+    ): Float = layerAlpha * opacity * (SNOW_ALPHA_BASE + SNOW_ALPHA_SHARE * level) * snowDim(night)
 
     private fun colour(
         day: IntArray,

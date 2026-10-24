@@ -23,13 +23,46 @@ class SnowProfile(
     val alpha: Float,
 )
 
-/** The three depth layers of the snow: far away the flakes are many, small, slow and faint, near they are few, big, quicker and bright */
+/**
+ * The three depth layers of the snow: far away the flakes are many, small, slow and faint, near they
+ * are few, big, quicker and bright. The near flakes are big, a twentieth of the height of the screen,
+ * and bright, as snow has to be seen at a glance from the sofa, while the far ones are only a fine
+ * texture behind them.
+ */
 object SnowProfiles {
-    val FAR = SnowProfile(share = 0.45f, fallPxPerSecond = 55f, diameterPx = 9f, swayPx = 10f, driftPxPerSecond = 40f, alpha = 0.50f)
-    val MIDDLE = SnowProfile(share = 0.35f, fallPxPerSecond = 90f, diameterPx = 14f, swayPx = 16f, driftPxPerSecond = 70f, alpha = 0.70f)
-    val NEAR = SnowProfile(share = 0.2f, fallPxPerSecond = 140f, diameterPx = 24f, swayPx = 26f, driftPxPerSecond = 110f, alpha = 0.85f)
+    val FAR = SnowProfile(share = 0.50f, fallPxPerSecond = 55f, diameterPx = 10f, swayPx = 10f, driftPxPerSecond = 40f, alpha = 0.55f)
+    val MIDDLE = SnowProfile(share = 0.36f, fallPxPerSecond = 95f, diameterPx = 26f, swayPx = 22f, driftPxPerSecond = 80f, alpha = 0.80f)
+    val NEAR = SnowProfile(share = 0.14f, fallPxPerSecond = 150f, diameterPx = 56f, swayPx = 36f, driftPxPerSecond = 120f, alpha = 0.90f)
 
     val ALL = listOf(FAR, MIDDLE, NEAR)
+}
+
+/**
+ * What a flake looks like: a soft round sprite, white in the middle and as solid as that for the first
+ * half of its radius, then fading to clear at the very edge. One sprite is made for each depth layer,
+ * as big as the biggest flake of it, and the others are drawn smaller.
+ */
+object SnowSprite {
+    /** How opaque the middle of the sprite is, from 0 to 255 */
+    const val CENTRE_ALPHA = 255
+
+    /** How opaque the sprite is where the solid part ends, from 0 to 255 */
+    const val BODY_ALPHA = 235
+
+    /** Where the solid part ends, as a share of the radius. From there to the edge it fades to clear */
+    const val BODY_END = 0.5f
+
+    /** How opaque the sprite is at a distance from its middle, from 0 (the middle) to 1 (the edge), as a number from 0 to 255 */
+    fun alphaAt(radiusShare: Float): Int {
+        val r = EffectMath.clamp01(radiusShare)
+        val alpha =
+            if (r <= BODY_END) {
+                EffectMath.lerp(CENTRE_ALPHA.toFloat(), BODY_ALPHA.toFloat(), r / BODY_END)
+            } else {
+                BODY_ALPHA * (1f - (r - BODY_END) / (1f - BODY_END))
+            }
+        return (alpha + 0.5f).toInt()
+    }
 }
 
 /**
@@ -164,7 +197,7 @@ class SnowLayer(
         private const val TWO_PI = (2.0 * Math.PI).toFloat()
 
         // More than the sway and half the biggest flake, so a flake is out of sight when it comes back
-        private const val SIDE_MARGIN_PX = 80f
+        private const val SIDE_MARGIN_PX = 120f
 
         // Flakes come back above the screen, up to this share of its height higher
         private const val SPAWN_DEPTH = 0.15f

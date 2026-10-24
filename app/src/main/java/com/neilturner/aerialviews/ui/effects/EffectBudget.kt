@@ -11,8 +11,8 @@ import kotlin.math.roundToInt
 object EffectBudget {
     const val RAIN_MIN = 150
     const val RAIN_MAX = 600
-    const val SNOW_MIN = 80
-    const val SNOW_MAX = 300
+    const val SNOW_MIN = 110
+    const val SNOW_MAX = 400
 
     /** A canvas which is not hardware accelerated is much slower, so it gets less of everything */
     const val SOFTWARE_QUALITY = 0.5f

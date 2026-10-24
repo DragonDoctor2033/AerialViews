@@ -15,12 +15,22 @@ internal class EffectBudgetTest {
     }
 
     @Test
-    fun `snow is 80 flakes in a light fall and 300 in a heavy one`() {
-        assertEquals(80, EffectBudget.snowCount(0f))
-        assertEquals(300, EffectBudget.snowCount(1f))
-        assertEquals(190, EffectBudget.snowCount(0.5f))
-        assertEquals(80, EffectBudget.SNOW_MIN)
-        assertEquals(300, EffectBudget.SNOW_MAX)
+    fun `snow is 110 flakes in a light fall and 400 in a heavy one`() {
+        assertEquals(110, EffectBudget.snowCount(0f))
+        assertEquals(400, EffectBudget.snowCount(1f))
+        assertEquals(255, EffectBudget.snowCount(0.5f))
+        assertEquals(110, EffectBudget.SNOW_MIN)
+        assertEquals(400, EffectBudget.SNOW_MAX)
+    }
+
+    @Test
+    fun `a typical snowfall has about a third more flakes than it had`() {
+        // At an intensity of 0.6, the one of the testing override, there were 212 flakes
+        val typical = EffectBudget.snowCount(0.6f)
+
+        assertEquals(284, typical)
+        assertTrue(typical in 270..300, "$typical flakes")
+        assertTrue(typical > 212 * 1.25f)
     }
 
     @Test
@@ -41,15 +51,15 @@ internal class EffectBudgetTest {
         assertEquals(150, EffectBudget.rainCount(-1f))
         assertEquals(600, EffectBudget.rainCount(2f))
         assertEquals(150, EffectBudget.rainCount(Float.NaN))
-        assertEquals(80, EffectBudget.snowCount(-1f))
-        assertEquals(300, EffectBudget.snowCount(9f))
+        assertEquals(110, EffectBudget.snowCount(-1f))
+        assertEquals(400, EffectBudget.snowCount(9f))
     }
 
     @Test
     fun `a device which can't take as much has a share of the count`() {
         assertEquals(300, EffectBudget.rainCount(1f, quality = 0.5f))
         assertEquals(75, EffectBudget.rainCount(0f, quality = 0.5f))
-        assertEquals(150, EffectBudget.snowCount(1f, quality = EffectBudget.SOFTWARE_QUALITY))
+        assertEquals(200, EffectBudget.snowCount(1f, quality = EffectBudget.SOFTWARE_QUALITY))
         assertEquals(0, EffectBudget.rainCount(1f, quality = 0f))
         assertEquals(600, EffectBudget.rainCount(1f, quality = 3f))
     }
@@ -84,16 +94,22 @@ internal class EffectBudgetTest {
 
     @Test
     fun `most flakes are far away and the fewest are near`() {
-        assertEquals(135, EffectBudget.snowLayerCount(300, 0))
-        assertEquals(105, EffectBudget.snowLayerCount(300, 1))
-        assertEquals(60, EffectBudget.snowLayerCount(300, 2))
+        val far = EffectBudget.snowLayerCount(400, 0)
+        val middle = EffectBudget.snowLayerCount(400, 1)
+        val near = EffectBudget.snowLayerCount(400, 2)
+
+        assertEquals(200, far)
+        assertEquals(144, middle)
+        assertEquals(56, near)
+        assertTrue(far > middle && middle > near)
     }
 
     @Test
     fun `each layer has room for its share of the most there is`() {
         assertEquals(600, (0 until 3).sumOf { EffectBudget.rainCapacity(it) })
-        assertEquals(300, (0 until 3).sumOf { EffectBudget.snowCapacity(it) })
+        assertEquals(400, (0 until 3).sumOf { EffectBudget.snowCapacity(it) })
         assertEquals(listOf(300, 180, 120), (0 until 3).map { EffectBudget.rainCapacity(it) })
+        assertEquals(listOf(200, 144, 56), (0 until 3).map { EffectBudget.snowCapacity(it) })
     }
 
     @Test
