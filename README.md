@@ -26,6 +26,7 @@ Inspired by Apple TV's beautiful video screensaver!
 * Alternate the position of overlays to avoid burn-in on QD/OLED TVs
 * Many playlist options to limit media length or loop certain videos
 * Play videos that [match the weather outside](#weather-matched-videos), based on folder and file names like `rain` or `snow`
+* Draw [weather effects](#weather-effects) over the video: rain, snow, fog, lightning and a grey overcast tone, following the weather outside
 * Use the D-Pad or swipe (on phones, tablets, etc) to skip media, skip songs, change speed, seek, pause and more
 * Refresh rate switching for 24fps, 30fps, 50fps, 60fps content
 
@@ -782,6 +783,18 @@ Every folder in the path counts, including the folder you chose for the source. 
 Use `Weather override (testing)` in the same settings category to pretend that it is raining (or any other weather) while you check your tags.
 
 </details>
+
+## Weather effects
+
+Aerial Views can draw the weather over the video, so the usual footage looks like the weather outside: streaks of rain, falling snow, drifting fog, flashes of lightning in a storm and a dull grey tone under overcast skies. It is on by default in this fork, under `Settings > Overlays > Weather effects`. It uses the location set under `Weather` and the same OpenWeather data as the weather overlays, which is looked up every hour, also when no weather overlay is shown, and at every look of the weather matching of the playlist.
+
+* Rain tilts with the wind, snow sways and drifts with it, and a storm adds a flash of lightning every 8 to 25 seconds, sometimes a double flash. The harder it rains or snows, the more there is: 150 to 600 streaks of rain, 80 to 300 flakes of snow. Drizzle, light and heavy rain are told apart by the condition and by the millimeters of rain or snow of the last hour. Clear sky and a few clouds draw nothing, broken and overcast clouds a grey tone which calms sunny footage.
+* By night everything is dimmer. A change of the weather is a crossfade of about two seconds, and the effects fade in when a clip starts and go when it ends, in the dark between two clips and in blackout.
+* `Intensity` (Subtle, Normal or Strong) scales how much there is.
+* `Skip on weather clips` (on by default) hides the effects while a video tagged with weather is playing, such as a `rain` clip, as it already shows that weather. See [weather-matched videos](#weather-matched-videos) for the tags. Photos and videos without a weather tag always get the effects.
+* `Frame rate` is 60 frames a second by default, and 30 is lighter on the device. The effects stop completely when there is nothing that moves, such as under overcast skies once the grey tone has faded in, when the screen is in blackout, and when the effects are off, which costs nothing and does not look up the weather.
+
+Use `Weather override (testing)` under `Settings > Playlist > Weather matching` (it can be changed when `Match videos to the current weather` is on) to try any weather on demand. The effects follow it too, at a typical intensity.
 
 ## Immich Server Setup
 
