@@ -12,6 +12,7 @@ import com.neilturner.aerialviews.databinding.OverlayViewBinding
 import com.neilturner.aerialviews.models.OverlayIds
 import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
+import com.neilturner.aerialviews.models.enums.AnalogClockSecondHandMotion
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.enums.OverlayType
 import com.neilturner.aerialviews.models.enums.SlotType
@@ -288,6 +289,7 @@ class OverlayHelper(
                     showSecondHand = AnalogClockPrefs.showSecondHand,
                     colour = ColourHelper.overlayColour(prefs.overlayColour),
                     halo = AnalogClockHalo.fromValue(AnalogClockPrefs.halo),
+                    secondHandMotion = AnalogClockSecondHandMotion.fromValue(AnalogClockPrefs.secondHandMotion),
                     burnInDrift = true,
                 )
             }
@@ -341,6 +343,7 @@ class OverlayHelper(
                         showSecondHand = AnalogClockPrefs.showSecondHand,
                         colour = ColourHelper.overlayColour(prefs.overlayColour),
                         halo = AnalogClockHalo.fromValue(AnalogClockPrefs.halo),
+                        secondHandMotion = AnalogClockSecondHandMotion.fromValue(AnalogClockPrefs.secondHandMotion),
                     )
                 }
             }

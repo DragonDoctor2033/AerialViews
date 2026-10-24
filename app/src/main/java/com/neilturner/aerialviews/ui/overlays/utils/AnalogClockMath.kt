@@ -25,6 +25,10 @@ object AnalogClockMath {
     private const val SECONDS_PER_MINUTE = 60.0
     private const val MINUTES_PER_HOUR = 60.0
     private const val MILLIS_PER_SECOND = 1000
+    private const val MILLIS_PER_MINUTE = 60_000
+    private const val MILLIS_PER_HOUR = 3_600_000
+    private const val MILLIS_PER_HALF_DAY = 43_200_000
+    private const val MILLIS_PER_DAY = 86_400_000L
     private const val FULL_CIRCLE = 360.0
 
     /**
@@ -52,6 +56,39 @@ object AnalogClockMath {
             second = normalise(secondFraction * DEGREES_PER_SECOND),
         )
     }
+
+    /**
+     * Milliseconds since midnight on the wall, for the instant [epochMillis] (milliseconds since
+     * 1970, which is what System.currentTimeMillis() gives) in a time zone which is
+     * [utcOffsetMillis] ahead of UTC at that instant, or behind it when negative. Always from 0
+     * up to, but not including, a whole day (86 400 000), also for instants before 1970.
+     *
+     * The offset is passed in, so this needs no time zone and can be tested on the JVM. The caller
+     * asks the time zone for the offset in force at [epochMillis] (TimeZone.getOffset(epochMillis)),
+     * which includes daylight saving time. So when the clocks change, the day jumps by the
+     * difference, just like the clock on the wall does.
+     */
+    fun millisOfDay(
+        epochMillis: Long,
+        utcOffsetMillis: Int,
+    ): Int = (epochMillis.mod(MILLIS_PER_DAY) + utcOffsetMillis).mod(MILLIS_PER_DAY).toInt()
+
+    /**
+     * Rotation of the hour hand at a time of the day, given as [millisOfDay], see [millisOfDay].
+     * It moves continuously, a 12 hour face turns once in 12 hours, so 3:30 puts it half way
+     * between the 3 and the 4. In the range [0, 360), like all the angles.
+     */
+    fun hourAngle(millisOfDay: Int): Float = turnAngle(millisOfDay, MILLIS_PER_HALF_DAY)
+
+    /** Rotation of the minute hand at a time of the day. It turns once an hour, without steps */
+    fun minuteAngle(millisOfDay: Int): Float = turnAngle(millisOfDay, MILLIS_PER_HOUR)
+
+    /**
+     * Rotation of the second hand at a time of the day. It turns once a minute, 6 degrees a
+     * second and 0.006 of a degree for every millisecond, so a clock which draws it on every
+     * frame has it sweeping smoothly instead of jumping from second to second.
+     */
+    fun secondAngle(millisOfDay: Int): Float = turnAngle(millisOfDay, MILLIS_PER_MINUTE)
 
     /**
      * Delay in milliseconds until the next whole second, given how far into the current
@@ -83,6 +120,12 @@ object AnalogClockMath {
     ): Float = -length * cos(toRadians(degrees)).toFloat()
 
     private fun toRadians(degrees: Float): Double = degrees.toDouble() * (PI / 180.0)
+
+    // How far a hand which turns once in [periodMillis] has turned, [elapsedMillis] into its turn
+    private fun turnAngle(
+        elapsedMillis: Int,
+        periodMillis: Int,
+    ): Float = normalise(elapsedMillis.mod(periodMillis) * FULL_CIRCLE / periodMillis)
 
     private fun normalise(degrees: Double): Float {
         val wrapped = degrees % FULL_CIRCLE

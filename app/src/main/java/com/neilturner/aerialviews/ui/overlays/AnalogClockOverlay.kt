@@ -7,16 +7,21 @@ import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.util.AttributeSet
+import android.view.Choreographer
 import android.view.View
+import android.view.ViewTreeObserver
 import androidx.core.graphics.withTranslation
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
+import com.neilturner.aerialviews.models.enums.AnalogClockSecondHandMotion
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockGeometry
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockHaloMath
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockMath
+import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockRefresh
 import com.neilturner.aerialviews.ui.overlays.utils.BurnInDrift
-import com.neilturner.aerialviews.ui.overlays.utils.ClockHandAngles
+import com.neilturner.aerialviews.ui.overlays.utils.ClockRefresh
 import java.time.LocalTime
+import java.util.TimeZone
 import kotlin.math.min
 
 /**
@@ -38,9 +43,18 @@ import kotlin.math.min
  * drift: it is shifted a few dp every minute, see [BurnInDrift]. That is the translation of the
  * view, which nothing else touches, so it doesn't get in the way of the fades, which animate alpha.
  *
- * The clock only keeps time while it is attached to a window and actually shown: it redraws once
- * a second, on the second boundary, and stops as soon as it is detached or hidden (for example
- * when the screensaver goes to blackout).
+ * The clock only keeps time while it is attached to a window and actually shown, and stops as soon
+ * as it is detached or hidden (for example when the screensaver goes to blackout). How it keeps
+ * time depends on the motion of the second hand, see [AnalogClockSecondHandMotion]:
+ *
+ * - Tick: it redraws once a second, on the second boundary of the wall clock, with the time read
+ *   at that moment. Drawing never reads the clock itself.
+ * - Smooth sweep: the second hand turns with the milliseconds, so the clock redraws on every frame
+ *   the display shows and every draw reads the time. That is only worth it while it can be seen, so
+ *   it also stops completely when auto-hide has faded it out to an alpha of 0, and starts again as
+ *   soon as it fades in. With no second hand there is nothing to sweep and it redraws once a second.
+ *
+ * What the clock has to be doing is decided by [AnalogClockRefresh.plan].
  */
 class AnalogClockOverlay
     @JvmOverloads
@@ -62,6 +76,11 @@ class AnalogClockOverlay
         private var halo = AnalogClockHalo.OFF
         private var haloMarginPx = 0
         private var showSecondHand = true
+        private var secondHandMotion = AnalogClockSecondHandMotion.DEFAULT
+
+        // Does the second hand sweep? Then the clock is redrawn on every frame, and each draw reads
+        // the time itself, see readSweepAngles()
+        private var sweeps = AnalogClockRefresh.sweeps(secondHandMotion, showSecondHand)
         private var colour = Color.WHITE
 
         private var burnInDrift = false
@@ -75,10 +94,20 @@ class AnalogClockOverlay
         private var haloRadius = 0f
         private var sizes = AnalogClockGeometry.forRadius(faceRadius)
 
-        // The time shown, refreshed by the tick. Drawing never reads the clock itself, so a
-        // redraw caused by something else (such as a fade) can't nudge the second hand between ticks
-        private var angles = ClockHandAngles(0f, 0f, 0f)
+        // The time shown, in degrees. When the second hand ticks they are refreshed by the tick, and
+        // drawing never reads the clock itself, so a redraw caused by something else (such as a fade)
+        // can't nudge the second hand between ticks. A sweeping clock reads the time on every draw
+        // instead. Plain floats rather than an object, so that a frame never allocates anything
+        private var hourAngle = 0f
+        private var minuteAngle = 0f
+        private var secondAngle = 0f
 
+        // A sweeping clock needs the time zone on every frame, but TimeZone.getDefault() hands out a
+        // copy each time. So the zone is kept, and looked up again once a minute in case it changed
+        private var timeZone: TimeZone = TimeZone.getDefault()
+        private var timeZoneMinute = NO_MINUTE
+
+        // Once a second, for the clock with a second hand which ticks, or without one
         private var ticking = false
         private val tick =
             object : Runnable {
@@ -92,6 +121,23 @@ class AnalogClockOverlay
                 }
             }
 
+        // On every frame, for the clock with a second hand which sweeps. The callback is posted
+        // again by every frame, so it is stopped by not posting it again, or by removing it
+        private var framing = false
+        private val choreographer by lazy(LazyThreadSafetyMode.NONE) { Choreographer.getInstance() }
+        private val frameCallback = Choreographer.FrameCallback { onFrame() }
+
+        // Nothing is scheduled while a sweeping clock is faded out, but its fade in has to be noticed.
+        // A view has no listener for its alpha going up, and an animation can change the alpha
+        // without calling the view at all. But the screen is always drawn again for a change of the
+        // alpha, and a pre-draw listener is called right before that, which is when the clock looks
+        private var watchingFadeIn = false
+        private val fadeInWatcher =
+            ViewTreeObserver.OnPreDrawListener {
+                if (alpha > 0f) updateRefresh()
+                true
+            }
+
         init {
             refreshAngles()
         }
@@ -103,6 +149,8 @@ class AnalogClockOverlay
          * @param colour overlay colour for the ticks, hour and minute hands and the centre dot.
          * The second hand always stays red
          * @param halo how dark the soft halo behind the face is, or off
+         * @param secondHandMotion a second hand which sweeps smoothly, or ticks once a second. It
+         * makes no difference without a second hand
          * @param burnInDrift move the clock a few dp every minute, for a clock which stays put
          */
         fun configure(
@@ -110,6 +158,7 @@ class AnalogClockOverlay
             showSecondHand: Boolean,
             colour: Int,
             halo: AnalogClockHalo,
+            secondHandMotion: AnalogClockSecondHandMotion = AnalogClockSecondHandMotion.DEFAULT,
             burnInDrift: Boolean = false,
         ) {
             val newDiameter = faceDiameterPx.coerceAtLeast(0)
@@ -120,6 +169,8 @@ class AnalogClockOverlay
                 requestLayout()
             }
             this.showSecondHand = showSecondHand
+            this.secondHandMotion = secondHandMotion
+            sweeps = AnalogClockRefresh.sweeps(secondHandMotion, showSecondHand)
             this.colour = colour
             this.burnInDrift = burnInDrift
             if (!burnInDrift) {
@@ -130,15 +181,17 @@ class AnalogClockOverlay
             }
             updateHaloShader()
             invalidate()
+            // The motion, or showing the second hand, can change what keeps the clock going
+            updateRefresh()
         }
 
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
-            updateTicking()
+            updateRefresh()
         }
 
         override fun onDetachedFromWindow() {
-            stopTicking()
+            stopRefreshing()
             super.onDetachedFromWindow()
         }
 
@@ -148,12 +201,12 @@ class AnalogClockOverlay
             visibility: Int,
         ) {
             super.onVisibilityChanged(changedView, visibility)
-            updateTicking()
+            updateRefresh()
         }
 
         override fun onWindowVisibilityChanged(visibility: Int) {
             super.onWindowVisibilityChanged(visibility)
-            updateTicking()
+            updateRefresh()
         }
 
         override fun onMeasure(
@@ -196,9 +249,15 @@ class AnalogClockOverlay
             haloPaint.shader = RadialGradient(centreX, centreY, haloRadius, colours, gradient.positions, Shader.TileMode.CLAMP)
         }
 
+        // This runs on every frame of a sweeping clock, so nothing in here, or in what it calls, may
+        // allocate anything (but the time zone, once a minute): no new objects, no boxing, no
+        // lambdas which capture something, no LocalTime.now()
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             if (faceRadius <= 0f) return
+
+            // The hand which sweeps shows the time of this very frame
+            if (sweeps) readSweepAngles()
 
             // Behind everything, so the thin lines and their shadow have something dark to stand on
             if (haloPaint.shader != null) {
@@ -226,11 +285,11 @@ class AnalogClockOverlay
             }
 
             paint.strokeCap = Paint.Cap.ROUND
-            drawHand(canvas, angles.hour, sizes.hourHandLength, sizes.hourHandWidth)
-            drawHand(canvas, angles.minute, sizes.minuteHandLength, sizes.minuteHandWidth)
+            drawHand(canvas, hourAngle, sizes.hourHandLength, sizes.hourHandWidth)
+            drawHand(canvas, minuteAngle, sizes.minuteHandLength, sizes.minuteHandWidth)
             if (showSecondHand) {
                 paint.color = secondHandColour
-                drawHand(canvas, angles.second, sizes.secondHandLength, sizes.secondHandWidth)
+                drawHand(canvas, secondAngle, sizes.secondHandLength, sizes.secondHandWidth)
                 paint.color = mainColour
             }
 
@@ -278,12 +337,36 @@ class AnalogClockOverlay
         private fun refreshAngles(): Int {
             val now = LocalTime.now()
             val millis = now.nano / NANOS_PER_MILLI
-            angles = AnalogClockMath.handAngles(now.hour, now.minute, now.second, millis)
+            val angles = AnalogClockMath.handAngles(now.hour, now.minute, now.second, millis)
+            hourAngle = angles.hour
+            minuteAngle = angles.minute
+            secondAngle = angles.second
             return millis
         }
 
-        // Moves the view to the spot for the current minute. The tick calls this every second,
-        // but it only does anything once a minute, and while the clock is hidden there are no ticks
+        // Sets all three hands for the time of this moment, with the milliseconds, so the second hand
+        // sweeps and the other two don't take steps either. It is only the time since the epoch and
+        // the offset of the time zone, in whole numbers, not a LocalTime for every frame
+        private fun readSweepAngles() {
+            val now = System.currentTimeMillis()
+
+            val minute = now / MILLIS_PER_MINUTE
+            if (minute != timeZoneMinute) {
+                // The only allocation, once a minute
+                timeZoneMinute = minute
+                timeZone = TimeZone.getDefault()
+            }
+
+            // The offset is asked for at this moment, so daylight saving time is taken care of
+            val millisOfDay = AnalogClockMath.millisOfDay(now, timeZone.getOffset(now))
+            hourAngle = AnalogClockMath.hourAngle(millisOfDay)
+            minuteAngle = AnalogClockMath.minuteAngle(millisOfDay)
+            secondAngle = AnalogClockMath.secondAngle(millisOfDay)
+        }
+
+        // Moves the view to the spot for the current minute. The tick and the frames call this all
+        // the time, but it only does anything once a minute, and while the clock is hidden, or
+        // faded out, there are no ticks or frames
         private fun updateDrift() {
             if (!burnInDrift) return
 
@@ -296,12 +379,43 @@ class AnalogClockOverlay
             translationY = offset.y
         }
 
-        private fun updateTicking() {
-            if (isAttachedToWindow && isShown && windowVisibility == VISIBLE) {
-                startTicking()
-            } else {
-                stopTicking()
+        private fun isOnScreen(): Boolean = isAttachedToWindow && isShown && windowVisibility == VISIBLE
+
+        // Works out what the clock has to be doing now and starts and stops things to match. It is
+        // called whenever something which counts changes: being attached, shown or hidden, the
+        // settings, and, for a clock which sweeps, the alpha
+        private fun updateRefresh() = applyRefresh(AnalogClockRefresh.plan(sweeps, isOnScreen(), alpha))
+
+        private fun applyRefresh(plan: ClockRefresh) {
+            when (plan) {
+                ClockRefresh.EVERY_FRAME -> {
+                    stopTicking()
+                    stopWatchingFadeIn()
+                    startFrames()
+                }
+
+                ClockRefresh.EVERY_SECOND -> {
+                    stopFrames()
+                    stopWatchingFadeIn()
+                    startTicking()
+                }
+
+                ClockRefresh.WAITING_FOR_FADE_IN -> {
+                    stopFrames()
+                    stopTicking()
+                    startWatchingFadeIn()
+                }
+
+                ClockRefresh.STOPPED -> {
+                    stopRefreshing()
+                }
             }
+        }
+
+        private fun stopRefreshing() {
+            stopFrames()
+            stopTicking()
+            stopWatchingFadeIn()
         }
 
         private fun startTicking() {
@@ -314,6 +428,53 @@ class AnalogClockOverlay
             if (!ticking) return
             ticking = false
             removeCallbacks(tick)
+        }
+
+        private fun startFrames() {
+            if (framing) return
+            framing = true
+            updateDrift()
+            // Right now, so that what comes next is not what was drawn the last time it was seen
+            invalidate()
+            choreographer.postFrameCallback(frameCallback)
+        }
+
+        private fun stopFrames() {
+            if (!framing) return
+            framing = false
+            choreographer.removeFrameCallback(frameCallback)
+        }
+
+        // One frame of a sweeping clock, just before the screen is drawn. The draw reads the time
+        private fun onFrame() {
+            if (!framing) return
+
+            // The fade out may have reached 0 since the last frame, or the clock was hidden
+            val plan = AnalogClockRefresh.plan(sweeps, isOnScreen(), alpha)
+            if (plan != ClockRefresh.EVERY_FRAME) {
+                // This callback is already used up, so there is nothing to remove
+                framing = false
+                applyRefresh(plan)
+                return
+            }
+
+            updateDrift()
+            invalidate()
+            choreographer.postFrameCallback(frameCallback)
+        }
+
+        private fun startWatchingFadeIn() {
+            if (watchingFadeIn) return
+            watchingFadeIn = true
+            viewTreeObserver.addOnPreDrawListener(fadeInWatcher)
+        }
+
+        private fun stopWatchingFadeIn() {
+            if (!watchingFadeIn) return
+            watchingFadeIn = false
+            // The observer of a window which is gone is dead, and the listener went with it
+            val observer = viewTreeObserver
+            if (observer.isAlive) observer.removeOnPreDrawListener(fadeInWatcher)
         }
 
         private companion object {

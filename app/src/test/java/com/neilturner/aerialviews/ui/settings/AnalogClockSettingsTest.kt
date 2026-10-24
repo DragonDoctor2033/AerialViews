@@ -148,6 +148,23 @@ internal class AnalogClockSettingsTest {
     }
 
     @Test
+    fun `both kinds of analog clock get the motion from the preference`() {
+        val helper = mainSource("com/neilturner/aerialviews/ui/helpers/OverlayHelper.kt")
+        val assignment = "secondHandMotion = AnalogClockSecondHandMotion.fromValue(AnalogClockPrefs.secondHandMotion)"
+
+        assertTrue(helper.isNotEmpty(), "No source file for OverlayHelper")
+        // One in a slot, one in the center of the screen
+        assertEquals(
+            2,
+            Regex
+                .escape(assignment)
+                .toRegex()
+                .findAll(helper)
+                .count(),
+        )
+    }
+
+    @Test
     fun `halo is a dropdown of the four levels`() {
         val halo = ResourceXml.preference(screen, AnalogClockPrefs.KEY_HALO)
         assertEquals("ListPreference", halo.tagName)
