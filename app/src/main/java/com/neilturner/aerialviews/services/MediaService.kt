@@ -138,7 +138,22 @@ class MediaService(
         providers.sortBy { it.type == ProviderSourceType.REMOTE }
     }
 
-    suspend fun fetchMedia(onStatus: (status: LoadingStatus) -> Unit = {}): MediaFetchResult =
+    /**
+     * Builds the playlist. The result says which weather it was matched to, so that it can be
+     * replaced when the weather changes.
+     *
+     * The other two are for replacing a playlist which is playing from the playlist cache, which
+     * the new playlist overwrites. With [keepCacheWhenEmpty], a playlist which found nothing is not
+     * written to the cache, as the playing one reads its items from the very table that would
+     * empty. With [playingMusic], the music which is playing is saved as it is, the same tracks in
+     * the same order, instead of being listed and shuffled again, so the saved track number still
+     * means the track that is playing.
+     */
+    suspend fun fetchMedia(
+        keepCacheWhenEmpty: Boolean = false,
+        playingMusic: MusicPlaylist? = null,
+        onStatus: (status: LoadingStatus) -> Unit = {},
+    ): MediaFetchResult =
         withContext(Dispatchers.IO) {
             val networkType = NetworkHelper.getNetworkType(context)
             val filterRemote = config.wifiOnly && !NetworkHelper.isOnWifiOrEthernet(context)
@@ -163,7 +178,7 @@ class MediaService(
                     if (cached != null) {
                         onStatus(LoadingStatus.RESUMING)
                         Timber.i("MediaService: USING CACHED PLAYLIST")
-                        return@withContext cached
+                        return@withContext cached.copy(weatherCondition = weatherCondition)
                     } else {
                         Timber.w("MediaService: Cache reported valid but failed to load")
                     }
@@ -299,23 +314,26 @@ class MediaService(
             }
 
             val musicPlaylist =
-                tracks
-                    .takeIf { it.isNotEmpty() }
-                    ?.let { availableTracks ->
-                        val orderedTracks = if (config.shuffleMusic) availableTracks.shuffled() else availableTracks
-                        MusicPlaylist(
-                            tracks = orderedTracks,
-                            shuffle = config.shuffleMusic,
-                            repeat = config.repeatMusic,
-                        )
-                    }
+                playingMusic
+                    ?: tracks
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { availableTracks ->
+                            val orderedTracks = if (config.shuffleMusic) availableTracks.shuffled() else availableTracks
+                            MusicPlaylist(
+                                tracks = orderedTracks,
+                                shuffle = config.shuffleMusic,
+                                repeat = config.repeatMusic,
+                            )
+                        }
 
             Timber.i("Total media items: ${filteredMedia.size}")
 
             // Track enabled media sources and media counts
             trackMediaUsage(filteredMedia)
 
-            if (config.playlistCache && cacheRepo != null) {
+            if (config.playlistCache && cacheRepo != null && filteredMedia.isEmpty() && keepCacheWhenEmpty) {
+                Timber.w("MediaService: Nothing found, leaving the playlist cache as it is")
+            } else if (config.playlistCache && cacheRepo != null) {
                 // Cache enabled: save to DB, return windowed playlist that streams from DB
                 cacheRepo.cachePlaylist(
                     media = filteredMedia,
@@ -327,7 +345,7 @@ class MediaService(
                 val cachedResult = cacheRepo.getCachedPlaylist()
                 if (cachedResult != null) {
                     Timber.i("MediaService: Fresh playlist cached and loaded from DB (${filteredMedia.size} items)")
-                    return@withContext cachedResult
+                    return@withContext cachedResult.copy(weatherCondition = weatherCondition)
                 }
                 Timber.w("MediaService: Failed to read back cached playlist, falling back to in-memory")
             } else {
@@ -337,6 +355,7 @@ class MediaService(
             return@withContext MediaFetchResult(
                 mediaPlaylist = MediaPlaylist(filteredMedia),
                 musicPlaylist = musicPlaylist,
+                weatherCondition = weatherCondition,
             )
         }
 

@@ -17,6 +17,7 @@ import com.neilturner.aerialviews.databinding.ImageViewBinding
 import com.neilturner.aerialviews.databinding.OverlayViewBinding
 import com.neilturner.aerialviews.databinding.VideoViewBinding
 import com.neilturner.aerialviews.models.LoadingStatus
+import com.neilturner.aerialviews.models.MediaFetchResult
 import com.neilturner.aerialviews.models.MediaPlaylist
 import com.neilturner.aerialviews.models.enums.AerialMediaType
 import com.neilturner.aerialviews.models.enums.DateType
@@ -24,15 +25,20 @@ import com.neilturner.aerialviews.models.enums.LocationType
 import com.neilturner.aerialviews.models.enums.MetadataType
 import com.neilturner.aerialviews.models.enums.OverlayType
 import com.neilturner.aerialviews.models.enums.ProgressBarLocation
+import com.neilturner.aerialviews.models.enums.WeatherCondition
 import com.neilturner.aerialviews.models.music.MusicPlaylist
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
 import com.neilturner.aerialviews.models.prefs.SonosPrefs
+import com.neilturner.aerialviews.models.prefs.WeatherVideoPrefs
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.services.KtorServer
 import com.neilturner.aerialviews.services.MediaService
 import com.neilturner.aerialviews.services.MusicPlayer
 import com.neilturner.aerialviews.services.NowPlayingService
 import com.neilturner.aerialviews.services.sonos.SonosService
+import com.neilturner.aerialviews.services.weather.WeatherConditionProvider
+import com.neilturner.aerialviews.services.weather.WeatherPlaylistRecheck
+import com.neilturner.aerialviews.services.weather.WeatherRecheckPolicy
 import com.neilturner.aerialviews.services.weather.WeatherService
 import com.neilturner.aerialviews.ui.controls.ProgressBar
 import com.neilturner.aerialviews.ui.controls.ProgressBarEvent
@@ -65,6 +71,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import me.kosert.flowbus.GlobalBus
 import timber.log.Timber
 import kotlin.math.abs
@@ -91,6 +98,7 @@ class ScreenController(
     private var sonosService: SonosService? = null
     private var weatherService: WeatherService? = null
     private var musicPlayer: MusicPlayer? = null
+    private var playingMusic: MusicPlaylist? = null
     private val overlayStateStore = OverlayStateStore()
     private val overlayEventBridge = OverlayEventBridge(overlayStateStore)
     private val metadataResolver = MetadataResolver()
@@ -115,6 +123,7 @@ class ScreenController(
     private var loopUntilSkipped = GeneralPrefs.loopUntilSkipped
     private var pauseStartTime: Long = 0
     private var sleepTimerJob: Job? = null
+    private var weatherRecheck: WeatherPlaylistRecheck? = null
     private val metadataJobs = mutableMapOf<OverlayType, Job>()
     private var currentMedia: AerialMedia? = null
     private var forcedMuteVideo = false
@@ -310,6 +319,7 @@ class ScreenController(
                     scheduleSleepTimer()
                 }
                 scheduleScheduledBlackout()
+                setUpWeatherRecheck(mediaResult.weatherCondition)
             } else {
                 showLoadingError()
             }
@@ -353,6 +363,57 @@ class ScreenController(
                     toggleBlackOutMode(BlackOutSource.SLEEP_TIMER)
                 }
             }
+    }
+
+    /**
+     * Looks at the weather again every few minutes while this plays, when the playlist is matched
+     * to the weather and the Playlist settings ask for it. [builtFor] is the weather the playlist
+     * was made for. The look is paused for a blackout and ends with [stop].
+     */
+    private fun setUpWeatherRecheck(builtFor: WeatherCondition?) {
+        if (isStopped || !WeatherVideoPrefs.matchWeather) return
+
+        val interval = WeatherRecheckPolicy.interval(WeatherVideoPrefs.recheckMinutes)
+        if (interval == null) {
+            Timber.i("Weather re-check disabled")
+            return
+        }
+
+        val weather = WeatherConditionProvider.create()
+        weatherRecheck =
+            WeatherPlaylistRecheck(
+                scope = mainScope,
+                interval = interval,
+                builtFor = builtFor,
+                currentCondition = { maxAge -> withContext(Dispatchers.IO) { weather.currentCondition(maxAge) } },
+                // The weather was just looked up, so the playlist is made for that one without asking
+                // again. The playlist which is playing may be reading from the playlist cache that
+                // this one replaces, so an empty one is not saved, and the music is saved as it is
+                rebuild = { condition ->
+                    MediaService(context, currentWeather = { condition })
+                        .fetchMedia(keepCacheWhenEmpty = true, playingMusic = playingMusic)
+                },
+                onPlaylistReady = ::switchPlaylist,
+            ).also { if (!blackOutMode) it.start() }
+    }
+
+    /**
+     * Plays the items after the current one from [result], which was made for the new weather.
+     *
+     * The photo or video on screen is not touched: it is held by its player and by [currentMedia],
+     * and the playlist is only asked for an item by [loadNextItem], once that item has faded out.
+     * So the switch is at the next media boundary, even though the playlist is replaced now. That
+     * matters with the playlist cache on: the new playlist has already replaced the cache, which the
+     * old playlist reads its items from, so the old one must not be asked for another.
+     */
+    private fun switchPlaylist(
+        result: MediaFetchResult,
+        condition: WeatherCondition,
+    ) {
+        Timber.i("Weather: $condition, the next item is from a new playlist of ${result.mediaPlaylist.size} items")
+        playlist = result.mediaPlaylist
+        // A playlist made with the cache on is saved with the music at its first track
+        if (GeneralPrefs.playlistCache) saveMusicTrackPosition()
     }
 
     private fun scheduleScheduledBlackout() {
@@ -436,6 +497,7 @@ class ScreenController(
 
         setVideoForcedMute(true)
 
+        playingMusic = musicPlaylist
         musicPlayer = MusicPlayer(context, musicPlaylist)
         musicPlayer?.onMediaItemChanged = { saveMusicTrackPosition() }
         musicPlayer?.onPlaybackFailed = { handleMusicPlaybackFailed() }
@@ -458,6 +520,7 @@ class ScreenController(
         Timber.i("MusicPlayer: playback abandoned, staying silent")
         musicPlayer?.release()
         musicPlayer = null
+        playingMusic = null
     }
 
     private fun loadItem(media: AerialMedia) {
@@ -847,8 +910,9 @@ class ScreenController(
             return
         }
 
+        // A playlist which has not played an item yet, such as one made for new weather, has no previous item
         val media =
-            if (previous) {
+            if (previous && playlist.currentPosition >= 0) {
                 playlist.previousItem()
             } else {
                 playlist.nextItem()
@@ -909,6 +973,8 @@ class ScreenController(
         musicPlayer?.pause()
         musicPlayer?.release()
         sleepTimerJob?.cancel()
+        weatherRecheck?.stop()
+        weatherRecheck = null
         scheduledBlackoutJob?.cancel()
         metadataJobs.values.forEach { it.cancel() }
         metadataJobs.clear()
@@ -944,6 +1010,7 @@ class ScreenController(
         blackOutMode = true
         blackOutSource = source
         sleepTimerJob?.cancel()
+        weatherRecheck?.pause()
         canSkip = false
 
         loadingView.animate().cancel()
@@ -978,6 +1045,7 @@ class ScreenController(
         loadNextItem()
         musicPlayer?.resume()
         scheduleSleepTimer()
+        weatherRecheck?.start()
     }
 
     fun nextTrack() {

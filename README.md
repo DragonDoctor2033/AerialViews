@@ -751,6 +751,8 @@ When the screensaver starts, the current weather is looked up (one quick request
 
 Photos are never filtered, and time-of-day filtering is applied first, so night clips are not played during the day. If the weather cannot be found (no location, no network), the playlist is not filtered.
 
+The weather is looked at again while the screensaver plays, every 20 minutes by default. Change it with `Settings > Playlist > Weather matching > Re-check the weather while playing` (Off, 10, 20, 30 or 60 minutes). If the weather has changed, say from clear to rain, a new playlist is made for it and the next video comes from that playlist. The video that is playing is never cut off, and the new playlist starts when it ends. If the weather cannot be found at that moment, or no videos are found, the playlist that is playing is kept and the weather is looked at again at the next time. When the weather could not be found at the start, a later look can still switch to the right videos. The `Weather override (testing)` is used for every look, and Off only looks at the weather when the screensaver starts. The new playlist is made from your sources again, so it takes a little longer if they are on a server. With the playlist cache on, the cache is replaced by the new playlist.
+
 <details>
 <summary>Tagging your videos</summary>
 &nbsp;

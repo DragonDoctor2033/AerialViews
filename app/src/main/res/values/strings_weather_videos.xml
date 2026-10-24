@@ -6,6 +6,31 @@
     <string name="weather_videos_match_title">Match videos to the current weather</string>
     <string name="weather_videos_match_summary">Prefer videos that suit the weather outside. Put the weather in folder or file names: clear, cloudy, rain, snow, storm or fog (e.g. Weather/rain/night/forest.mp4 or beach_clear_day.mp4). Videos without a weather name are used when nothing matches. Uses the location set under Time of Day.</string>
 
+    <string name="weather_videos_recheck_title">Re-check the weather while playing</string>
+
+    <string name="weather_videos_recheck_off">Off</string>
+    <string name="weather_videos_recheck_10">10 minutes</string>
+    <string name="weather_videos_recheck_20">20 minutes*</string>
+    <string name="weather_videos_recheck_30">30 minutes</string>
+    <string name="weather_videos_recheck_60">60 minutes</string>
+
+    <!-- Minutes between looks at the weather while the screensaver plays, 0 is off -->
+    <string-array name="weather_videos_recheck_entries" translatable="false">
+        <item>@string/weather_videos_recheck_off</item>
+        <item>@string/weather_videos_recheck_10</item>
+        <item>@string/weather_videos_recheck_20</item>
+        <item>@string/weather_videos_recheck_30</item>
+        <item>@string/weather_videos_recheck_60</item>
+    </string-array>
+    <string-array name="weather_videos_recheck_values" translatable="false">
+        <item>0</item>
+        <item>10</item>
+        <item>20</item>
+        <item>30</item>
+        <item>60</item>
+    </string-array>
+    <string name="weather_videos_recheck_default" translatable="false">20</string>
+
     <string name="weather_videos_override_title">Weather override (testing)</string>
 
     <string name="weather_videos_override_off">Off</string>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import com.neilturner.aerialviews.data.PlaylistCacheRepository
 import com.neilturner.aerialviews.data.network.NetworkHelper
+import com.neilturner.aerialviews.models.MediaFetchResult
 import com.neilturner.aerialviews.models.MediaPlaylist
 import com.neilturner.aerialviews.models.enums.AerialMediaSource
 import com.neilturner.aerialviews.models.enums.AerialMediaType
@@ -16,6 +17,7 @@ import com.neilturner.aerialviews.models.enums.WeatherCondition.FOG
 import com.neilturner.aerialviews.models.enums.WeatherCondition.RAIN
 import com.neilturner.aerialviews.models.enums.WeatherCondition.SNOW
 import com.neilturner.aerialviews.models.enums.WeatherCondition.STORM
+import com.neilturner.aerialviews.models.music.MusicPlaylist
 import com.neilturner.aerialviews.models.music.MusicTrack
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.models.videos.AerialMediaMetadata
@@ -24,6 +26,7 @@ import com.neilturner.aerialviews.providers.ProviderFetchResult
 import com.neilturner.aerialviews.utils.FirebaseHelper
 import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -37,7 +40,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -87,10 +93,11 @@ internal class MediaServiceWeatherTest {
     private fun service(
         media: List<AerialMedia>,
         config: MediaService.Config = config(),
+        music: List<MusicTrack> = emptyList(),
         weather: suspend () -> WeatherCondition?,
     ) = MediaService(
         context = context,
-        providers = mutableListOf(FakeMediaProvider(context, media)),
+        providers = mutableListOf(FakeMediaProvider(context, media, music)),
         config = config,
         hashFn = { "test-hash" },
         currentWeather = {
@@ -306,16 +313,290 @@ internal class MediaServiceWeatherTest {
             }
         }
 
+    // The weather the playlist was matched to
+
+    @Test
+    fun `the result says which weather the playlist was matched to`() =
+        runTest {
+            val result = service(listOf(video("rain", RAIN), video("plain"))) { RAIN }.fetchMedia()
+
+            assertEquals(RAIN, result.weatherCondition)
+        }
+
+    @Test
+    fun `the result says the weather even when no video is tagged for it`() =
+        runTest {
+            val result = service(listOf(video("snow", SNOW), video("plain"))) { CLEAR }.fetchMedia()
+
+            // The videos which were left are untagged ones, but the playlist was made for the clear sky
+            assertEquals(CLEAR, result.weatherCondition)
+        }
+
+    @Test
+    fun `the result has no weather when the weather was not known`() =
+        runTest {
+            val result = service(listOf(video("snow", SNOW), video("plain"))) { null }.fetchMedia()
+
+            assertNull(result.weatherCondition)
+        }
+
+    @Test
+    fun `the result has no weather when looking it up failed`() =
+        runTest {
+            val result = service(listOf(video("plain"))) { error("no network") }.fetchMedia()
+
+            assertNull(result.weatherCondition)
+        }
+
+    @Test
+    fun `the result has no weather when matching is off`() =
+        runTest {
+            val result =
+                service(listOf(video("rain", RAIN)), config = config().copy(weatherMatch = false)) { RAIN }
+                    .fetchMedia()
+
+            assertNull(result.weatherCondition)
+            assertEquals(0, weatherLookups)
+        }
+
+    @Test
+    fun `each playlist is made for the weather the service is given`() =
+        runTest {
+            val rain = video("rain", RAIN)
+            val snow = video("snow", SNOW)
+
+            val forRain = service(listOf(rain, snow)) { RAIN }.fetchMedia()
+            val forSnow = service(listOf(rain, snow)) { SNOW }.fetchMedia()
+
+            assertEquals(listOf(RAIN, SNOW), listOf(forRain.weatherCondition, forSnow.weatherCondition))
+            assertEquals(listOf(rain), forRain.mediaPlaylist.items())
+            assertEquals(listOf(snow), forSnow.mediaPlaylist.items())
+        }
+
+    @Test
+    fun `a playlist from the cache says which weather it was matched to`() =
+        runTest {
+            val cached =
+                MediaFetchResult(
+                    mediaPlaylist = MediaPlaylist(listOf(video("rain", RAIN))),
+                    musicPlaylist = null,
+                    musicResumeIndex = 2,
+                    isFromCache = true,
+                )
+            mockkConstructor(PlaylistCacheRepository::class)
+
+            try {
+                coEvery { anyConstructed<PlaylistCacheRepository>().isCacheValid(any()) } returns true
+                coEvery { anyConstructed<PlaylistCacheRepository>().getCachedPlaylist() } returns cached
+
+                val result =
+                    service(listOf(video("rain", RAIN)), config = config().copy(playlistCache = true)) { RAIN }
+                        .fetchMedia()
+
+                assertEquals(RAIN, result.weatherCondition)
+                assertSame(cached.mediaPlaylist, result.mediaPlaylist)
+                assertEquals(2, result.musicResumeIndex)
+                assertTrue(result.isFromCache)
+            } finally {
+                unmockkConstructor(PlaylistCacheRepository::class)
+            }
+        }
+
+    @Test
+    fun `a playlist which was just cached says which weather it was matched to`() =
+        runTest {
+            val readBack =
+                MediaFetchResult(
+                    mediaPlaylist = MediaPlaylist(listOf(video("snow", SNOW))),
+                    musicPlaylist = null,
+                    isFromCache = true,
+                )
+            mockkConstructor(PlaylistCacheRepository::class)
+
+            try {
+                coEvery { anyConstructed<PlaylistCacheRepository>().isCacheValid(any()) } returns false
+                coEvery { anyConstructed<PlaylistCacheRepository>().getCachedPlaylist() } returns readBack
+                coEvery {
+                    anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any())
+                } just Runs
+
+                val result =
+                    service(listOf(video("snow", SNOW)), config = config().copy(playlistCache = true)) { SNOW }
+                        .fetchMedia()
+
+                assertEquals(SNOW, result.weatherCondition)
+                assertSame(readBack.mediaPlaylist, result.mediaPlaylist)
+            } finally {
+                unmockkConstructor(PlaylistCacheRepository::class)
+            }
+        }
+
+    @Test
+    fun `a playlist which was not read back from the cache still says which weather it was matched to`() =
+        runTest {
+            mockkConstructor(PlaylistCacheRepository::class)
+
+            try {
+                coEvery { anyConstructed<PlaylistCacheRepository>().isCacheValid(any()) } returns false
+                coEvery { anyConstructed<PlaylistCacheRepository>().getCachedPlaylist() } returns null
+                coEvery {
+                    anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any())
+                } just Runs
+
+                val result =
+                    service(listOf(video("fog", FOG)), config = config().copy(playlistCache = true)) { FOG }
+                        .fetchMedia()
+
+                assertEquals(FOG, result.weatherCondition)
+                assertEquals(1, result.mediaPlaylist.size)
+            } finally {
+                unmockkConstructor(PlaylistCacheRepository::class)
+            }
+        }
+
+    // Replacing a playlist which is playing from the cache
+
+    private fun withCache(block: suspend () -> Unit) =
+        runTest {
+            mockkConstructor(PlaylistCacheRepository::class)
+            try {
+                coEvery { anyConstructed<PlaylistCacheRepository>().isCacheValid(any()) } returns false
+                coEvery { anyConstructed<PlaylistCacheRepository>().getCachedPlaylist() } returns null
+                coEvery {
+                    anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any())
+                } just Runs
+                block()
+            } finally {
+                unmockkConstructor(PlaylistCacheRepository::class)
+            }
+        }
+
+    private fun cacheWrites() =
+        coVerify(exactly = 1) { anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any()) }
+
+    private fun noCacheWrites() =
+        coVerify(exactly = 0) { anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any()) }
+
+    @Test
+    fun `a playlist which found nothing does not empty the cache when asked to keep it`() =
+        withCache {
+            val result =
+                service(emptyList(), config = config().copy(playlistCache = true)) { RAIN }
+                    .fetchMedia(keepCacheWhenEmpty = true)
+
+            noCacheWrites()
+            coVerify(exactly = 0) { anyConstructed<PlaylistCacheRepository>().getCachedPlaylist() }
+            assertEquals(0, result.mediaPlaylist.size)
+            assertEquals(RAIN, result.weatherCondition)
+        }
+
+    @Test
+    fun `a playlist which found nothing is cached as it always was when not asked to keep the cache`() =
+        withCache {
+            val result =
+                service(emptyList(), config = config().copy(playlistCache = true)) { RAIN }
+                    .fetchMedia()
+
+            cacheWrites()
+            assertEquals(0, result.mediaPlaylist.size)
+        }
+
+    @Test
+    fun `a playlist which found something is cached even when asked to keep the cache if it is empty`() =
+        withCache {
+            val rain = video("rain", RAIN)
+
+            val result =
+                service(listOf(rain), config = config().copy(playlistCache = true)) { RAIN }
+                    .fetchMedia(keepCacheWhenEmpty = true)
+
+            cacheWrites()
+            assertEquals(listOf(rain), result.mediaPlaylist.items())
+        }
+
+    @Test
+    fun `asking to keep the cache changes nothing while the cache is off`() =
+        runTest {
+            val rain = video("rain", RAIN)
+
+            val result =
+                service(listOf(rain), config = config().copy(playlistCache = false)) { RAIN }
+                    .fetchMedia(keepCacheWhenEmpty = true)
+            val empty =
+                service(emptyList(), config = config().copy(playlistCache = false)) { RAIN }
+                    .fetchMedia(keepCacheWhenEmpty = true)
+
+            assertEquals(listOf(rain), result.mediaPlaylist.items())
+            assertEquals(0, empty.mediaPlaylist.size)
+        }
+
+    private fun track(name: String) = MusicTrack(uri = mockk(relaxed = true, name = name), source = AerialMediaSource.LOCAL)
+
+    private fun cachedMusicInto(cachedMusic: MutableList<MusicPlaylist?>) {
+        coEvery {
+            anyConstructed<PlaylistCacheRepository>().cachePlaylist(any(), any(), any(), any())
+        } coAnswers {
+            cachedMusic += secondArg<MusicPlaylist?>()
+        }
+    }
+
+    @Test
+    fun `the music which is playing is cached as it is, not listed and shuffled again`() =
+        withCache {
+            val playing = MusicPlaylist(tracks = listOf(track("b"), track("a")), shuffle = true, repeat = true)
+            val cachedMusic = mutableListOf<MusicPlaylist?>()
+            cachedMusicInto(cachedMusic)
+
+            val result =
+                service(
+                    listOf(video("rain", RAIN)),
+                    config = config().copy(playlistCache = true, shuffleMusic = true),
+                    music = listOf(track("a"), track("b"), track("c")),
+                ) { RAIN }.fetchMedia(playingMusic = playing)
+
+            assertSame(playing, cachedMusic.single())
+            assertSame(playing, result.musicPlaylist)
+        }
+
+    @Test
+    fun `the music is listed as usual when none is playing`() =
+        withCache {
+            val listed = listOf(track("a"), track("b"), track("c"))
+            val cachedMusic = mutableListOf<MusicPlaylist?>()
+            cachedMusicInto(cachedMusic)
+
+            service(
+                listOf(video("rain", RAIN)),
+                config = config().copy(playlistCache = true),
+                music = listed,
+            ) { RAIN }.fetchMedia()
+
+            assertEquals(listed, cachedMusic.single()?.tracks)
+        }
+
+    @Test
+    fun `the result keeps the music which is playing while the cache is off`() =
+        runTest {
+            val playing = MusicPlaylist(tracks = listOf(track("x")))
+
+            val result =
+                service(listOf(video("rain", RAIN)), music = listOf(track("a"))) { RAIN }
+                    .fetchMedia(playingMusic = playing)
+
+            assertSame(playing, result.musicPlaylist)
+        }
+
     private class FakeMediaProvider(
         context: Context,
         private val media: List<AerialMedia>,
+        private val music: List<MusicTrack> = emptyList(),
     ) : MediaProvider(context) {
         override val type: ProviderSourceType = ProviderSourceType.LOCAL
         override val enabled: Boolean = true
 
         override suspend fun fetch(): ProviderFetchResult = ProviderFetchResult.Success(media = media, summary = "")
 
-        override suspend fun fetchMusic(): List<MusicTrack> = emptyList()
+        override suspend fun fetchMusic(): List<MusicTrack> = music
 
         override suspend fun fetchMetadata(media: List<AerialMedia>): List<AerialMedia> = media
 
