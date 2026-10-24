@@ -390,6 +390,19 @@ internal class LightningSchedulerTest {
     }
 
     @Test
+    fun `the second flash of a double flash builds up in 40 ms and fades in 600 ms, with the same ease-out`() {
+        val delay = 400L
+
+        // The first flash has nearly faded when the second one is a quarter of the way through its fade, with three quarters left of it
+        assertEquals(0.6f * 0.5625f, LightningFlash.level(delay + 40L + 150L, doubleFlash = true, secondDelayMillis = delay), 0.0001f)
+        // After the build up of 40 ms, the second is at its peak. Before it, it comes up smoothly from the first
+        assertEquals(0.6f, LightningFlash.level(delay + 40L, doubleFlash = true, secondDelayMillis = delay), 0.0001f)
+        assertTrue(LightningFlash.level(delay + 10L, doubleFlash = true, secondDelayMillis = delay) < 0.6f)
+        // And it is over 640 ms after it started, while the first flash is long over
+        assertEquals(0f, LightningFlash.level(delay + 40L + 600L, doubleFlash = true, secondDelayMillis = delay))
+    }
+
+    @Test
     fun `a flash is as long as 70 ms and 800 ms say, and a custom one as it is told`() {
         assertEquals(1f, LightningFlash.flash(100f, attackMillis = 100f, decayMillis = 200f))
         assertEquals(0.25f, LightningFlash.flash(200f, attackMillis = 100f, decayMillis = 200f), 0.0001f)
