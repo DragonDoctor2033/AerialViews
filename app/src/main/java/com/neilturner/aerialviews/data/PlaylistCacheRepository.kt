@@ -5,15 +5,10 @@ import androidx.core.net.toUri
 import com.neilturner.aerialviews.models.MediaFetchResult
 import com.neilturner.aerialviews.models.MediaPlaylist
 import com.neilturner.aerialviews.models.enums.AerialMediaSource
-import com.neilturner.aerialviews.models.enums.AerialMediaType
-import com.neilturner.aerialviews.models.enums.SceneType
-import com.neilturner.aerialviews.models.enums.TimeOfDay
 import com.neilturner.aerialviews.models.music.MusicPlaylist
 import com.neilturner.aerialviews.models.music.MusicTrack
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
-import com.neilturner.aerialviews.models.videos.AerialExifMetadata
 import com.neilturner.aerialviews.models.videos.AerialMedia
-import com.neilturner.aerialviews.models.videos.AerialMediaMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -88,7 +83,7 @@ class PlaylistCacheRepository(
 
             val mediaList =
                 try {
-                    cachedMediaChunks.map { mapEntityToMedia(it) }
+                    cachedMediaChunks.map { it.toAerialMedia() }
                 } catch (e: Exception) {
                     Timber.e(e, "PlaylistCache: Failed to map cached media entities")
                     clearCache()
@@ -163,40 +158,12 @@ class PlaylistCacheRepository(
     ): List<AerialMedia> =
         withContext(Dispatchers.IO) {
             try {
-                dao.getMediaItemsChunk(limit, offset).map { mapEntityToMedia(it) }
+                dao.getMediaItemsChunk(limit, offset).map { it.toAerialMedia() }
             } catch (e: Exception) {
                 Timber.e(e, "PlaylistCache: Failed to map chunk")
                 emptyList()
             }
         }
-
-    private fun mapEntityToMedia(entity: CachedMediaEntity): AerialMedia =
-        AerialMedia(
-            uri = entity.uri.toUri(),
-            type = enumValueOf<AerialMediaType>(entity.type),
-            source = enumValueOf<AerialMediaSource>(entity.source),
-            metadata =
-                AerialMediaMetadata(
-                    shortDescription = entity.shortDescription,
-                    pointsOfInterest = entity.pointsOfInterest,
-                    timeOfDay = enumValueOf<TimeOfDay>(entity.timeOfDay),
-                    scene = enumValueOf<SceneType>(entity.scene),
-                    albumName = entity.albumName,
-                    title = entity.title,
-                    exif =
-                        AerialExifMetadata(
-                            date = entity.exifDate,
-                            offset = entity.exifOffset,
-                            latitude = entity.exifLatitude,
-                            longitude = entity.exifLongitude,
-                            city = entity.exifCity,
-                            state = entity.exifState,
-                            country = entity.exifCountry,
-                            description = entity.exifDescription,
-                        ),
-                ),
-            audioUri = entity.audioUri?.toUri(),
-        )
 
     suspend fun cachePlaylist(
         media: List<AerialMedia>,
@@ -205,30 +172,7 @@ class PlaylistCacheRepository(
         shuffleEnabled: Boolean,
     ) = withContext(Dispatchers.IO) {
         val music = musicPlaylist?.tracks ?: emptyList()
-        val mediaEntities =
-            media.mapIndexed { index, m ->
-                CachedMediaEntity(
-                    playlistOrder = index,
-                    uri = m.uri.toString(),
-                    type = m.type.name,
-                    source = m.source.name,
-                    shortDescription = m.metadata.shortDescription,
-                    pointsOfInterest = m.metadata.pointsOfInterest,
-                    timeOfDay = m.metadata.timeOfDay.name,
-                    scene = m.metadata.scene.name,
-                    albumName = m.metadata.albumName,
-                    title = m.metadata.title,
-                    exifDate = m.metadata.exif.date,
-                    exifOffset = m.metadata.exif.offset,
-                    exifLatitude = m.metadata.exif.latitude,
-                    exifLongitude = m.metadata.exif.longitude,
-                    exifCity = m.metadata.exif.city,
-                    exifState = m.metadata.exif.state,
-                    exifCountry = m.metadata.exif.country,
-                    exifDescription = m.metadata.exif.description,
-                    audioUri = m.audioUri?.toString(),
-                )
-            }
+        val mediaEntities = media.mapIndexed { index, m -> m.toCachedEntity(index) }
 
         val musicEntities =
             music.mapIndexed { index, t ->

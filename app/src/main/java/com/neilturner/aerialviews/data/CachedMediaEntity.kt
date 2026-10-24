@@ -27,4 +27,6 @@ data class CachedMediaEntity(
     val exifCountry: String?,
     val exifDescription: String?,
     val audioUri: String? = null,
+    // Comma separated WeatherCondition names, null when the media is untagged
+    val weather: String? = null,
 )
