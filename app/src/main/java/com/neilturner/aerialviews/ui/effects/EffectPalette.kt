@@ -11,8 +11,14 @@ object EffectPalette {
     /** The grey-blue tone of the sky is this opaque at the most, at an intensity of 1 */
     const val TINT_MAX_ALPHA = 0.30f
 
-    /** The light veil which lowers the contrast in fog is this opaque at the most, at an intensity of 1 */
-    const val VEIL_MAX_ALPHA = 0.34f
+    /**
+     * The veil which lowers the contrast in fog is this opaque at the most, at an intensity of 1. The
+     * fog of a typical foggy day, at an intensity of 0.7, has a veil of about 0.31 at the bottom of the screen
+     */
+    const val VEIL_MAX_ALPHA = 0.45f
+
+    /** The veil is this much as dense at the top of the screen as it is at the bottom, like fog which lies on the ground */
+    const val VEIL_TOP_SHARE = 0.70f
 
     /** A flash of lightning is this opaque at the most */
     const val FLASH_MAX_ALPHA = 0.70f
@@ -20,13 +26,16 @@ object EffectPalette {
     /** How much brighter the rain is for the moment of a flash, at the brightest */
     const val FLASH_RAIN_BOOST = 0.8f
 
-    /** The opacity of the layers of fog, far to near, at an intensity of 1 */
-    val FOG_LAYER_ALPHA = floatArrayOf(0.46f, 0.38f, 0.30f)
+    /**
+     * The opacity of the layers of fog, far to near, at an intensity of 1, where the noise is at its
+     * thickest. Fog at an intensity of 0.7 has peaks of 0.41 to 0.49 in it
+     */
+    val FOG_LAYER_ALPHA = floatArrayOf(0.70f, 0.64f, 0.58f)
 
     // How much fainter things are by night, from none (0) to gone (1)
     private const val NIGHT_TINT_DIM = 0.4f
-    private const val NIGHT_VEIL_DIM = 0.3f
-    private const val NIGHT_FOG_DIM = 0.5f
+    private const val NIGHT_VEIL_DIM = 0.15f
+    private const val NIGHT_FOG_DIM = 0.3f
     private const val NIGHT_RAIN_DIM = 0.45f
 
     // Snow is only a little dimmer by night, as it has to stay clearly seen
@@ -34,7 +43,7 @@ object EffectPalette {
 
     // The lowest brightness the fog gets to by night, in 0 to 255, as the colour of the fog is
     // multiplied by it
-    private const val NIGHT_FOG_LIGHT = 72
+    private const val NIGHT_FOG_LIGHT = 96
 
     // Lighter snow is fainter: a base and a share of the intensity
     private const val SNOW_ALPHA_BASE = 0.85f
@@ -44,7 +53,7 @@ object EffectPalette {
     private val TINT_DAY = intArrayOf(78, 90, 108)
     private val TINT_NIGHT = intArrayOf(10, 14, 24)
     private val VEIL_DAY = intArrayOf(216, 222, 230)
-    private val VEIL_NIGHT = intArrayOf(58, 64, 78)
+    private val VEIL_NIGHT = intArrayOf(80, 86, 98)
     private val RAIN_DAY = intArrayOf(208, 226, 255)
     private val RAIN_NIGHT = intArrayOf(150, 168, 205)
     private val FLASH = intArrayOf(236, 242, 255)
@@ -71,7 +80,7 @@ object EffectPalette {
         alpha: Float,
     ): Int = colour(TINT_DAY, TINT_NIGHT, night, alpha)
 
-    /** The light veil of fog, which lifts the dark parts of the footage */
+    /** The veil of fog, which lowers the contrast: light grey by day, and a darker grey by night so that it does not glow */
     fun veil(
         night: Float,
         alpha: Float,
@@ -88,12 +97,35 @@ object EffectPalette {
 
     /**
      * What the colour of the fog is multiplied by to darken it for the night, as a grey
-     * (lighting colour filter): all of it by day, and a bit under a third by night.
+     * (lighting colour filter): all of it by day, and a bit over a third by night.
      */
     fun fogLight(night: Float): Int {
         val level = EffectMath.mixChannel(255, NIGHT_FOG_LIGHT, night)
         return EffectMath.argb(255, level, level, level)
     }
+
+    /**
+     * How opaque the veil of fog is at the bottom of the screen, with everything in it which is not the colour
+     *
+     * @param level the intensity of the fog, from 0 to 1
+     * @param opacity how much of the fog is there, as it fades in and out, from 0 to 1
+     */
+    fun veilAlpha(
+        level: Float,
+        opacity: Float,
+        night: Float,
+    ): Float = VEIL_MAX_ALPHA * level * opacity * veilDim(night)
+
+    /** How much of the veil there is at a [height] of the screen, from 0 (top) to 1 (bottom): the fog is denser towards the ground */
+    fun veilHeightShare(height: Float): Float = EffectMath.lerp(VEIL_TOP_SHARE, 1f, EffectMath.clamp01(height))
+
+    /** How opaque a layer of fog is where its noise is at its thickest, [layer] 0 is the far one */
+    fun fogLayerAlpha(
+        layer: Int,
+        level: Float,
+        opacity: Float,
+        night: Float,
+    ): Float = FOG_LAYER_ALPHA[layer] * level * opacity * fogDim(night)
 
     /**
      * How opaque the flakes of a layer of snow are, with everything in it which is not the colour

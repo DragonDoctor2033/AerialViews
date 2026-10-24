@@ -119,10 +119,19 @@ internal class FogNoiseTest {
     @Test
     fun `low noise is clear air, high noise is thick fog, and in between it thickens`() {
         assertEquals(0f, FogNoise.fogAmount(0f))
-        assertEquals(0f, FogNoise.fogAmount(0.34f))
-        assertEquals(1f, FogNoise.fogAmount(0.74f))
+        assertEquals(0f, FogNoise.fogAmount(0.30f))
+        assertEquals(1f, FogNoise.fogAmount(0.66f))
         assertEquals(1f, FogNoise.fogAmount(1f))
-        assertEquals(0.5f, FogNoise.fogAmount(0.54f), 0.001f)
+        assertEquals(0.5f, FogNoise.fogAmount(0.48f), 0.001f)
+    }
+
+    @Test
+    fun `the fog starts and is all there close to the middle of the noise, where most of it is`() {
+        // Fog which starts at the middle is thick on a good half of the picture
+        assertEquals(0.5f, FogNoise.fogAmount(0.5f), 0.1f)
+        assertTrue(FogNoise.fogAmount(0.5f) > FogNoise.fogAmount(0.45f))
+        assertTrue(FogNoise.fogAmount(0.34f) > 0f, "it starts earlier than it did, at 0.34")
+        assertTrue(FogNoise.fogAmount(0.74f) == 1f)
     }
 
     @Test
@@ -160,6 +169,21 @@ internal class FogNoiseTest {
             assertTrue(clear > 2000, "seed $seed: clear pixels: $clear")
             assertTrue(thick > 2000, "seed $seed: thick pixels: $thick")
             assertTrue(alphas.max() > 200, "seed $seed: thickest ${alphas.max()}")
+        }
+    }
+
+    @Test
+    fun `the fog is dense, more than a third of every texture is thick, and not flat`() {
+        FogLayers.SEEDS.forEach { seed ->
+            val alphas = FogNoise.texturePixels(seed, 232, 236, 242).map { ((it ushr 24) and 0xFF) / 255f }.sorted()
+            val thick = alphas.count { it > 0.5f }
+            val spread = alphas[alphas.size * 9 / 10] - alphas[alphas.size / 10]
+
+            println("fog seed $seed: thick $thick of ${alphas.size}, spread $spread, mean ${alphas.average()}")
+            assertTrue(thick > alphas.size / 3, "seed $seed: thick pixels: $thick")
+            // Banks and thin places side by side, so that it reads as fog and not as a grey screen
+            assertTrue(spread > 0.5f, "seed $seed: spread $spread")
+            assertTrue(alphas.average() in 0.3..0.6, "seed $seed: mean ${alphas.average()}")
         }
     }
 

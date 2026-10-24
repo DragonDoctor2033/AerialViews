@@ -18,9 +18,11 @@ object FogNoise {
     /** The side of a fog texture. Small, as it is stretched over the whole screen */
     const val TEXTURE_SIZE = 256
 
-    // Where the clouds in the noise start and are all there: noise below the first is clear air
-    private const val CLOUD_FROM = 0.34f
-    private const val CLOUD_TO = 0.74f
+    // Where the clouds in the noise start and are all there: noise below the first is clear air. The
+    // noise is mostly around its middle, 0.5, so these are close to it: a good half of the fog is
+    // thick, and only a few of it is clear air
+    private const val CLOUD_FROM = 0.30f
+    private const val CLOUD_TO = 0.66f
 
     private const val BASE_CELLS = 3
     private const val OCTAVES = 4

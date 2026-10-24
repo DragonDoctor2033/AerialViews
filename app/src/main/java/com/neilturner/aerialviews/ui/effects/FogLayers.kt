@@ -14,8 +14,11 @@ object FogLayers {
     /** Where each layer's noise comes from. Fixed, so the fog looks the same every time */
     val SEEDS = longArrayOf(0x51F0A1L, 0x2C7B93L, 0x7E4D15L)
 
-    /** How many widths of the screen one tile of the texture is stretched over: the bigger, the bigger the clouds */
-    val ZOOM = floatArrayOf(1.6f, 1.1f, 2.2f)
+    /**
+     * How many widths of the screen one tile of the texture is stretched over: the bigger, the bigger the
+     * clouds. Never less than 1, so that no tile can be seen twice side by side
+     */
+    val ZOOM = floatArrayOf(1.3f, 1.0f, 1.8f)
 
     /** Sideways drift of each layer, in widths of the screen per second. Negative is to the left */
     val SPEED_X = floatArrayOf(0.012f, -0.008f, 0.004f)

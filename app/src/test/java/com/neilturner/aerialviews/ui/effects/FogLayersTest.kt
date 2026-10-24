@@ -33,6 +33,12 @@ internal class FogLayersTest {
     }
 
     @Test
+    fun `a tile is never smaller than the screen is wide, so it can not be seen twice side by side`() {
+        assertTrue(FogLayers.ZOOM.all { it >= 1f }, "${FogLayers.ZOOM.toList()}")
+        assertEquals(listOf(1.3f, 1.0f, 1.8f), FogLayers.ZOOM.toList())
+    }
+
+    @Test
     fun `the fog drifts slowly, the fastest layer takes over a minute to cross the screen`() {
         val fastest = (0 until 3).maxOf { kotlin.math.abs(FogLayers.SPEED_X[it]) }
 

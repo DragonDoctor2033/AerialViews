@@ -63,9 +63,17 @@ internal class EffectPaletteTest {
     }
 
     @Test
-    fun `the veil of fog is light by day and dark by night`() {
-        assertTrue(brightness(EffectPalette.veil(0f, 1f)) > 600)
-        assertTrue(brightness(EffectPalette.veil(1f, 1f)) < 250)
+    fun `the veil of fog is light grey by day and a darker grey by night, so that it does not glow`() {
+        val day = EffectPalette.veil(0f, 1f)
+        val night = EffectPalette.veil(1f, 1f)
+
+        assertEquals(EffectMath.argb(255, 216, 222, 230), day)
+        assertEquals(EffectMath.argb(255, 80, 86, 98), night)
+        assertTrue(brightness(day) > 600)
+        assertTrue(brightness(night) < brightness(day) * 0.45f)
+        // But it is not black: it has to be seen over footage which is bright, too
+        assertTrue(brightness(night) > 200)
+        assertTrue(blue(night) > red(night), "a grey with a touch of blue")
     }
 
     @Test
@@ -133,13 +141,14 @@ internal class EffectPaletteTest {
     }
 
     @Test
-    fun `the fog is lit with all of its light by day and under a third of it by night`() {
+    fun `the fog is lit with all of its light by day and a bit over a third of it by night`() {
         val day = EffectPalette.fogLight(0f)
         val night = EffectPalette.fogLight(1f)
 
         assertEquals(EffectMath.argb(255, 255, 255, 255), day)
-        assertEquals(EffectMath.argb(255, 72, 72, 72), night)
-        assertTrue(red(night) * 3 < 255 + 72)
+        assertEquals(EffectMath.argb(255, 96, 96, 96), night)
+        assertTrue(red(night) < 255 * 0.4f)
+        assertTrue(red(night) > 255 * 0.3f)
         assertEquals(red(day), green(day))
         assertEquals(red(night), blue(night))
     }
@@ -153,11 +162,68 @@ internal class EffectPaletteTest {
     @Test
     fun `no layer is more opaque than the most it is meant to be`() {
         assertTrue(EffectPalette.TINT_MAX_ALPHA in 0.1f..0.4f)
-        assertTrue(EffectPalette.VEIL_MAX_ALPHA in 0.1f..0.4f)
+        assertTrue(EffectPalette.VEIL_MAX_ALPHA in 0.3f..0.5f)
         assertTrue(EffectPalette.FLASH_MAX_ALPHA in 0.5f..0.9f)
-        // Fog stacks up, so the layers are well below solid even together
-        val together = 1f - EffectPalette.FOG_LAYER_ALPHA.fold(1f) { clear, layer -> clear * (1f - layer) }
-        assertTrue(together < 0.8f, "three layers together: $together")
-        assertTrue(EffectPalette.FOG_LAYER_ALPHA.all { it in 0.1f..0.5f })
+        assertTrue(EffectPalette.FOG_LAYER_ALPHA.all { it in 0.4f..0.8f })
+
+        // Fog stacks up, so where all three layers are at their thickest it is dense but not solid
+        fun together(level: Float) = 1f - EffectPalette.FOG_LAYER_ALPHA.fold(1f) { clear, layer -> clear * (1f - layer * level) }
+        assertTrue(together(0.7f) < 0.85f, "three layers together, in typical fog: ${together(0.7f)}")
+        assertTrue(together(1f) < 0.97f, "three layers together, at the most: ${together(1f)}")
+    }
+
+    // Fog
+
+    @Test
+    fun `fog is clearly seen at a typical intensity, a veil of a quarter to a third and peaks of 0 4 to 0 5`() {
+        // The weather of fog and the testing override are 0.7, at the normal intensity of the settings
+        val typical = 0.7f
+
+        val veil = EffectPalette.veilAlpha(typical, 1f, 0f)
+        assertTrue(veil in 0.25f..0.35f, "veil $veil")
+        EffectPalette.FOG_LAYER_ALPHA.indices.forEach { layer ->
+            val peak = EffectPalette.fogLayerAlpha(layer, typical, 1f, 0f)
+            assertTrue(peak in 0.4f..0.5f, "layer $layer peaks at $peak")
+        }
+    }
+
+    @Test
+    fun `the veil and the layers of fog are the intensity, the fade and the night`() {
+        assertEquals(0.45f, EffectPalette.veilAlpha(1f, 1f, 0f), 0.0001f)
+        assertEquals(0.45f * 0.5f * 0.25f, EffectPalette.veilAlpha(0.5f, 0.25f, 0f), 0.0001f)
+        assertEquals(0f, EffectPalette.veilAlpha(0.7f, 0f, 0f))
+        assertEquals(0.45f * 0.85f, EffectPalette.veilAlpha(1f, 1f, 1f), 0.0001f)
+
+        assertEquals(0.70f, EffectPalette.fogLayerAlpha(0, 1f, 1f, 0f), 0.0001f)
+        assertEquals(0.58f * 0.5f * 0.5f, EffectPalette.fogLayerAlpha(2, 0.5f, 0.5f, 0f), 0.0001f)
+        assertEquals(0.64f * 0.7f, EffectPalette.fogLayerAlpha(1, 1f, 1f, 1f), 0.0001f)
+        assertEquals(0f, EffectPalette.fogLayerAlpha(1, 1f, 0f, 0f))
+    }
+
+    @Test
+    fun `by night the veil is dimmed less than the clouds, so that the fog still reads as fog`() {
+        assertEquals(0.85f, EffectPalette.veilDim(1f), 0.0001f)
+        assertEquals(0.7f, EffectPalette.fogDim(1f), 0.0001f)
+        assertTrue(EffectPalette.veilDim(1f) > EffectPalette.fogDim(1f))
+        // A veil over footage of the night is still a good quarter
+        assertTrue(EffectPalette.veilAlpha(0.7f, 1f, 1f) > 0.25f)
+    }
+
+    @Test
+    fun `the veil is a little denser towards the bottom of the screen, like fog on the ground`() {
+        assertEquals(0.7f, EffectPalette.veilHeightShare(0f), 0.0001f)
+        assertEquals(1f, EffectPalette.veilHeightShare(1f), 0.0001f)
+        assertEquals(0.85f, EffectPalette.veilHeightShare(0.5f), 0.0001f)
+        assertEquals(0.7f, EffectPalette.VEIL_TOP_SHARE)
+        // Only a little: the top is not clear air
+        assertTrue(EffectPalette.VEIL_TOP_SHARE in 0.6f..0.85f)
+        var previous = 0f
+        for (step in 0..20) {
+            val share = EffectPalette.veilHeightShare(step / 20f)
+            assertTrue(share >= previous, "at $step")
+            previous = share
+        }
+        assertEquals(0.7f, EffectPalette.veilHeightShare(-3f), 0.0001f)
+        assertEquals(1f, EffectPalette.veilHeightShare(3f), 0.0001f)
     }
 }

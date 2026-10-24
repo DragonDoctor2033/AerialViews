@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.LightingColorFilter
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.RectF
@@ -50,8 +51,9 @@ interface EffectsSurface {
  * - Snow is flakes in three depth layers, drawn as soft sprites which are made once. They fall
  *   slowly, sway and drift with the wind. See [SnowLayer].
  * - Fog is three big soft textures of noise, made once at a low resolution on another thread and
- *   stretched with a filter, drifting slowly in different directions, and a light veil which lowers
- *   the contrast. See [FogNoise] and [FogLayers].
+ *   stretched with a filter, drifting slowly in different directions, and a veil which lowers the
+ *   contrast, light grey by day and darker by night, and a little denser towards the bottom of the
+ *   screen like fog on the ground. See [FogNoise] and [FogLayers].
  * - A storm is rain and flashes of lightning, see [LightningScheduler]. Overcast is a grey-blue tone
  *   which dims the footage. Rain, snow and fog come with some of it.
  * - By night everything is dimmer.
@@ -117,6 +119,10 @@ class WeatherEffectsView
             }
         private val snowPaint = Paint().apply { isFilterBitmap = true }
         private val fogPaints = Array(FogLayers.COUNT) { Paint().apply { isFilterBitmap = true } }
+
+        // The veil is a gradient of white, denser towards the bottom, which is given its colour by a
+        // colour filter (light grey by day, darker by night) and its opacity by the alpha of the paint
+        private val veilPaint = Paint().apply { colorFilter = LightingColorFilter(EffectPalette.veil(0f, 1f), 0) }
         private val spriteRect = RectF()
 
         // On every frame, while something moves. The callback is posted again by every frame, so it
@@ -177,6 +183,7 @@ class WeatherEffectsView
             snowSprites = null
             fogBitmaps = null
             fogPaints.forEach { it.shader = null }
+            veilPaint.shader = null
         }
 
         // View
@@ -221,6 +228,8 @@ class WeatherEffectsView
             snowLayers?.forEach { it.resize(w.toFloat(), h.toFloat()) }
             // The sprites are as big as the flakes of this screen, so they are made again
             snowSprites = null
+            // And the gradients go from the top of the screen to its bottom
+            veilPaint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), VEIL_TOP, VEIL_BOTTOM, Shader.TileMode.CLAMP)
         }
 
         // This runs on every frame, so nothing in here, or in what it calls, may allocate anything:
@@ -262,9 +271,9 @@ class WeatherEffectsView
             if (opacity <= 0f) return
             val level = mix.fog.level
 
-            // The veil lifts the dark parts of the footage, which lowers the contrast
-            val veil = EffectPalette.VEIL_MAX_ALPHA * level * opacity * EffectPalette.veilDim(night)
-            if (EffectMath.toByte(veil) > 0) canvas.drawColor(EffectPalette.veil(night, veil))
+            // The veil lowers the contrast of the footage, the most towards the bottom, like fog on the ground
+            veilPaint.alpha = EffectMath.toByte(EffectPalette.veilAlpha(level, opacity, night))
+            if (veilPaint.alpha > 0 && veilPaint.shader != null) canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), veilPaint)
 
             // The clouds. Each is a tile of noise which repeats, stretched over the screen and moved by
             // moving the canvas under it, which is cheaper than moving the texture
@@ -274,7 +283,7 @@ class WeatherEffectsView
             for (i in 0 until FogLayers.COUNT) {
                 val paint = fogPaints[i]
                 if (paint.shader == null) continue
-                paint.alpha = EffectMath.toByte(EffectPalette.FOG_LAYER_ALPHA[i] * level * opacity * EffectPalette.fogDim(night))
+                paint.alpha = EffectMath.toByte(EffectPalette.fogLayerAlpha(i, level, opacity, night))
                 if (paint.alpha == 0) continue
 
                 val scale = w * FogLayers.ZOOM[i] / FogNoise.TEXTURE_SIZE
@@ -512,14 +521,17 @@ class WeatherEffectsView
             }
         }
 
-        // The fog is darker by night. The filter which does that is made again only when the night
-        // has moved a good bit, so there are a few dozen of them in a fade, and none the rest of the time
+        // The fog is darker by night, and its veil is a darker grey. The filters which do that are made
+        // again only when the night has moved a good bit, so there are a few dozen of them in a fade,
+        // and none the rest of the time
         private fun updateFogLight() {
             val step = (mix.night * FOG_LIGHT_STEPS).toInt()
             if (step == fogLightStep) return
             fogLightStep = step
-            val filter = LightingColorFilter(EffectPalette.fogLight(step / FOG_LIGHT_STEPS), 0)
+            val night = step / FOG_LIGHT_STEPS
+            val filter = LightingColorFilter(EffectPalette.fogLight(night), 0)
             for (paint in fogPaints) paint.colorFilter = filter
+            veilPaint.colorFilter = LightingColorFilter(EffectPalette.veil(night, 1f), 0)
         }
 
         // Making what is needed
@@ -615,6 +627,10 @@ class WeatherEffectsView
 
             // The night fades the fog's light in this many steps
             const val FOG_LIGHT_STEPS = 32f
+
+            // The gradient of the veil: white, a share of it at the top and all of it at the bottom
+            val VEIL_TOP = EffectMath.argb(EffectMath.toByte(EffectPalette.VEIL_TOP_SHARE), 255, 255, 255)
+            val VEIL_BOTTOM = EffectMath.argb(255, 255, 255, 255)
 
             // A flake: solid in the middle, softer towards the edge and clear at the very edge, see SnowSprite
             const val MIN_SPRITE_PX = 4
