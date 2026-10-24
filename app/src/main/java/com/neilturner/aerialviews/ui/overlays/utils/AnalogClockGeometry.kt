@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.overlays.utils
 
+import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import kotlin.math.roundToInt
 
@@ -24,6 +25,8 @@ data class ClockFaceSizes(
 /**
  * Proportions of the clock face, kept free of android classes so they can be unit tested.
  * Everything is a fraction of the face radius, so all three sizes look identical, just scaled.
+ * The one exception is the thickness of the lines, which grows a little on the bigger faces so
+ * they still read from the sofa, see [strokeBoost].
  */
 object AnalogClockGeometry {
     const val TICK_COUNT = 12
@@ -52,21 +55,53 @@ object AnalogClockGeometry {
 
     private const val CENTRE_DOT_RADIUS = 0.05f
 
+    // Lines get thicker, in proportion, on bigger faces. Up to the medium clock in a corner (a
+    // radius of 110 px on a 1080p TV) nothing changes, from there the boost grows in a straight
+    // line to its full size at a radius of 300 px, which is about the biggest clock in the center
+    const val BOOST_FROM_RADIUS = 110f
+    const val BOOST_TO_RADIUS = 300f
+    const val MAX_BOOST = 0.30f
+
     fun forRadius(radius: Float): ClockFaceSizes {
         val r = if (radius.isFinite()) radius.coerceAtLeast(0f) else 0f
+        val boost = strokeBoost(r)
         return ClockFaceSizes(
             regularTickLength = r * REGULAR_TICK_LENGTH,
-            regularTickWidth = stroke(r * REGULAR_TICK_WIDTH),
+            regularTickWidth = stroke(r * REGULAR_TICK_WIDTH * boost),
             quarterTickLength = r * QUARTER_TICK_LENGTH,
-            quarterTickWidth = stroke(r * QUARTER_TICK_WIDTH),
+            quarterTickWidth = stroke(r * QUARTER_TICK_WIDTH * boost),
             hourHandLength = r * HOUR_HAND_LENGTH,
-            hourHandWidth = stroke(r * HOUR_HAND_WIDTH),
+            hourHandWidth = stroke(r * HOUR_HAND_WIDTH * boost),
             minuteHandLength = r * MINUTE_HAND_LENGTH,
-            minuteHandWidth = stroke(r * MINUTE_HAND_WIDTH),
+            minuteHandWidth = stroke(r * MINUTE_HAND_WIDTH * boost),
             secondHandLength = r * SECOND_HAND_LENGTH,
-            secondHandWidth = stroke(r * SECOND_HAND_WIDTH),
-            centreDotRadius = r * CENTRE_DOT_RADIUS,
+            secondHandWidth = stroke(r * SECOND_HAND_WIDTH * boost),
+            centreDotRadius = r * CENTRE_DOT_RADIUS * boost,
         )
+    }
+
+    /**
+     * How many times thicker than its proportion a line is drawn on a face of this [radius] in
+     * pixels: 1 up to [BOOST_FROM_RADIUS], then more and more up to 1 + [MAX_BOOST] at
+     * [BOOST_TO_RADIUS] and beyond. Thin hands that look fine on a small clock get lost on a
+     * big one, seen from across the room.
+     */
+    fun strokeBoost(radius: Float): Float {
+        if (!radius.isFinite()) return 1f
+        val progress = (radius - BOOST_FROM_RADIUS) / (BOOST_TO_RADIUS - BOOST_FROM_RADIUS)
+        return 1f + MAX_BOOST * progress.coerceIn(0f, 1f)
+    }
+
+    /**
+     * Side of the square view in pixels: the face, plus all round it the room which the [halo]
+     * needs to fade out in, or just the face if there is none.
+     */
+    fun viewSizePx(
+        faceDiameterPx: Int,
+        halo: AnalogClockHalo,
+    ): Int {
+        val face = faceDiameterPx.coerceAtLeast(0)
+        return face + 2 * AnalogClockHaloMath.marginPx(face / 2f, halo)
     }
 
     /** Rotation of a tick mark, clockwise from 12 o'clock: 0, 30, 60 ... 330 */

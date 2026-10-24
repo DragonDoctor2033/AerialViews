@@ -26,6 +26,24 @@
     <string name="analog_clock_size_default" translatable="false">MEDIUM</string>
     <string name="analog_clock_show_second_hand_title">Show second hand</string>
     <string name="analog_clock_show_second_hand_summary">A thin red hand that moves once a second</string>
+    <string name="analog_clock_halo_title">Background halo</string>
+    <string name="analog_clock_halo_off">Off</string>
+    <string name="analog_clock_halo_light">Light</string>
+    <string name="analog_clock_halo_medium">Medium*</string>
+    <string name="analog_clock_halo_strong">Strong</string>
+    <string-array name="analog_clock_halo_entries" translatable="false">
+        <item>@string/analog_clock_halo_off</item>
+        <item>@string/analog_clock_halo_light</item>
+        <item>@string/analog_clock_halo_medium</item>
+        <item>@string/analog_clock_halo_strong</item>
+    </string-array>
+    <string-array name="analog_clock_halo_values" translatable="false">
+        <item>OFF</item>
+        <item>LIGHT</item>
+        <item>MEDIUM</item>
+        <item>STRONG</item>
+    </string-array>
+    <string name="analog_clock_halo_default" translatable="false">MEDIUM</string>
 
     <!-- Slots, listed by the slot_entries array in arrays.xml -->
     <string name="slot_analog_clock">Analog clock</string>

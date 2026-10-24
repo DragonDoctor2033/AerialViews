@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.settings
 
+import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.prefs.AnalogClockPrefs
 import com.neilturner.aerialviews.testutils.ResourceXml
@@ -24,9 +25,13 @@ internal class AnalogClockSettingsTest {
     fun `settings screen uses the keys of the preference object`() {
         val keys = ResourceXml.elementsWithAttribute(screen, "app:key").map { it.getAttribute("app:key") }
 
-        assertEquals(listOf(AnalogClockPrefs.KEY_SIZE, AnalogClockPrefs.KEY_SHOW_SECOND_HAND), keys)
+        assertEquals(
+            listOf(AnalogClockPrefs.KEY_SIZE, AnalogClockPrefs.KEY_SHOW_SECOND_HAND, AnalogClockPrefs.KEY_HALO),
+            keys,
+        )
         assertEquals("analog_clock_size", AnalogClockPrefs.KEY_SIZE)
         assertEquals("analog_clock_show_second_hand", AnalogClockPrefs.KEY_SHOW_SECOND_HAND)
+        assertEquals("analog_clock_halo", AnalogClockPrefs.KEY_HALO)
     }
 
     @Test
@@ -60,6 +65,31 @@ internal class AnalogClockSettingsTest {
         assertEquals("CheckBoxPreference", secondHand.tagName)
         assertEquals("true", secondHand.getAttribute("app:defaultValue"))
         assertEquals("@string/analog_clock_show_second_hand_title", secondHand.getAttribute("app:title"))
+    }
+
+    @Test
+    fun `halo is a dropdown of the four levels`() {
+        val halo = ResourceXml.preference(screen, AnalogClockPrefs.KEY_HALO)
+        assertEquals("ListPreference", halo.tagName)
+        assertEquals("@array/analog_clock_halo_entries", halo.getAttribute("app:entries"))
+        assertEquals("@array/analog_clock_halo_values", halo.getAttribute("app:entryValues"))
+        assertEquals("@string/analog_clock_halo_title", halo.getAttribute("app:title"))
+
+        val values = ResourceXml.stringArray(strings, "analog_clock_halo_values")
+        val entries = ResourceXml.stringArray(strings, "analog_clock_halo_entries")
+        assertEquals(listOf("OFF", "LIGHT", "MEDIUM", "STRONG"), values)
+        assertEquals(AnalogClockHalo.entries.map { it.name }, values)
+        assertEquals(values.size, entries.size)
+    }
+
+    @Test
+    fun `halo is medium by default`() {
+        val halo = ResourceXml.preference(screen, AnalogClockPrefs.KEY_HALO)
+        val default = ResourceXml.strings(strings).getValue("analog_clock_halo_default")
+
+        assertEquals("@string/analog_clock_halo_default", halo.getAttribute("app:defaultValue"))
+        assertEquals("MEDIUM", default)
+        assertEquals(AnalogClockHalo.DEFAULT.name, default)
     }
 
     @Test
@@ -103,7 +133,10 @@ internal class AnalogClockSettingsTest {
     fun `every string the screens use is defined`() {
         val defined = ResourceXml.defaultStringNames()
         val used = stringReferences(screen) + stringReferences(overlaysScreen).filter { "analog" in it }
-        val listed = ResourceXml.stringArray(strings, "analog_clock_size_entries").map { it.removePrefix("@string/") }
+        val listed =
+            listOf("analog_clock_size_entries", "analog_clock_halo_entries")
+                .flatMap { ResourceXml.stringArray(strings, it) }
+                .map { it.removePrefix("@string/") }
 
         assertTrue(used.isNotEmpty())
         (used + listed).forEach { name ->

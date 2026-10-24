@@ -16,5 +16,13 @@
                     app:key="analog_clock_show_second_hand"
                     app:summary="@string/analog_clock_show_second_hand_summary"
                     app:title="@string/analog_clock_show_second_hand_title" />
+
+                <ListPreference
+                    app:defaultValue="@string/analog_clock_halo_default"
+                    app:entries="@array/analog_clock_halo_entries"
+                    app:entryValues="@array/analog_clock_halo_values"
+                    app:key="analog_clock_halo"
+                    app:title="@string/analog_clock_halo_title"
+                    app:useSimpleSummaryProvider="true" />
         </PreferenceCategory>
 </PreferenceScreen>

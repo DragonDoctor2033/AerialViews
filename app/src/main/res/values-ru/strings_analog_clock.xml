@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <resources>
+  <string name="analog_clock_halo_light">Слабый</string>
+  <string name="analog_clock_halo_medium">Средний*</string>
+  <string name="analog_clock_halo_off">Выкл.</string>
+  <string name="analog_clock_halo_strong">Сильный</string>
+  <string name="analog_clock_halo_title">Ореол за часами</string>
   <string name="analog_clock_show_second_hand_summary">Тонкая красная стрелка, которая двигается раз в секунду</string>
   <string name="analog_clock_show_second_hand_title">Показывать секундную стрелку</string>
   <string name="analog_clock_size_large">Большой</string>

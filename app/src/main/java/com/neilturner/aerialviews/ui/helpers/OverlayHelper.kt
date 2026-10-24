@@ -9,6 +9,7 @@ import androidx.constraintlayout.helper.widget.Flow
 import com.neilturner.aerialviews.R
 import com.neilturner.aerialviews.databinding.OverlayViewBinding
 import com.neilturner.aerialviews.models.OverlayIds
+import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.enums.OverlayType
 import com.neilturner.aerialviews.models.enums.SlotType
@@ -24,6 +25,7 @@ import com.neilturner.aerialviews.ui.overlays.MetadataOverlay
 import com.neilturner.aerialviews.ui.overlays.NowPlayingOverlay
 import com.neilturner.aerialviews.ui.overlays.WeatherForecastOverlay
 import com.neilturner.aerialviews.ui.overlays.WeatherNowOverlay
+import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockGeometry
 
 class OverlayHelper(
     private val context: Context,
@@ -276,9 +278,14 @@ class OverlayHelper(
             OverlayType.ANALOG_CLOCK -> {
                 AnalogClockOverlay(context).apply {
                     configure(
-                        size = AnalogClockSize.fromValue(AnalogClockPrefs.size),
+                        faceDiameterPx =
+                            AnalogClockGeometry.diameterPx(
+                                AnalogClockSize.fromValue(AnalogClockPrefs.size),
+                                context.resources.displayMetrics.density,
+                            ),
                         showSecondHand = AnalogClockPrefs.showSecondHand,
                         colour = ColourHelper.overlayColour(prefs.overlayColour),
+                        halo = AnalogClockHalo.fromValue(AnalogClockPrefs.halo),
                     )
                 }
             }

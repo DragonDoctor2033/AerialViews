@@ -4,11 +4,15 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.graphics.withTranslation
+import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockGeometry
+import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockHaloMath
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockMath
 import com.neilturner.aerialviews.ui.overlays.utils.ClockHandAngles
 import java.time.LocalTime
@@ -18,6 +22,10 @@ import kotlin.math.min
  * Analog clock overlay, drawn on the canvas with no bitmaps: 12 tick marks (longer and thicker at
  * 12, 3, 6 and 9), thin hour and minute hands with rounded ends, a thin red second hand and a small
  * centre dot, on a transparent background.
+ *
+ * A soft dark halo, a radial gradient of black, is drawn behind the face so the thin lines stay
+ * readable on bright footage. Real background blur needs API 31 and the Shield is on API 30. The
+ * view is made bigger than the face by the room the halo fades out in, so that it is never cut off.
  *
  * Like the other overlays it is a plain view that [OverlayHelper][com.neilturner.aerialviews.ui.helpers.OverlayHelper]
  * places in a corner slot, so the screen controller's fade, auto-hide and alternate position
@@ -42,14 +50,18 @@ class AnalogClockOverlay
         private val edgeInset = shadowOffset + 1f
 
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isDither = true }
 
-        private var diameterPx = AnalogClockGeometry.diameterPx(AnalogClockSize.DEFAULT, density)
+        private var faceDiameterPx = AnalogClockGeometry.diameterPx(AnalogClockSize.DEFAULT, density)
+        private var halo = AnalogClockHalo.OFF
+        private var haloMarginPx = 0
         private var showSecondHand = true
         private var colour = Color.WHITE
 
         private var centreX = 0f
         private var centreY = 0f
         private var faceRadius = 0f
+        private var haloRadius = 0f
         private var sizes = AnalogClockGeometry.forRadius(faceRadius)
 
         // The time shown, refreshed by the tick. Drawing never reads the clock itself, so a
@@ -73,23 +85,29 @@ class AnalogClockOverlay
         }
 
         /**
-         * @param size face size, scaled by the screen density
+         * @param faceDiameterPx size of the face in pixels, see [AnalogClockGeometry.diameterPx].
+         * The view itself is bigger when there is a halo, which needs room all round the face
          * @param showSecondHand the red second hand can be turned off in the settings
          * @param colour overlay colour for the ticks, hour and minute hands and the centre dot.
          * The second hand always stays red
+         * @param halo how dark the soft halo behind the face is, or off
          */
         fun configure(
-            size: AnalogClockSize,
+            faceDiameterPx: Int,
             showSecondHand: Boolean,
             colour: Int,
+            halo: AnalogClockHalo,
         ) {
-            val newDiameter = AnalogClockGeometry.diameterPx(size, density)
-            if (newDiameter != diameterPx) {
-                diameterPx = newDiameter
+            val newDiameter = faceDiameterPx.coerceAtLeast(0)
+            if (newDiameter != this.faceDiameterPx || halo != this.halo) {
+                this.faceDiameterPx = newDiameter
+                this.halo = halo
+                haloMarginPx = AnalogClockHaloMath.marginPx(newDiameter / 2f, halo)
                 requestLayout()
             }
             this.showSecondHand = showSecondHand
             this.colour = colour
+            updateHaloShader()
             invalidate()
         }
 
@@ -121,9 +139,10 @@ class AnalogClockOverlay
             widthMeasureSpec: Int,
             heightMeasureSpec: Int,
         ) {
+            val viewSize = AnalogClockGeometry.viewSizePx(faceDiameterPx, halo)
             setMeasuredDimension(
-                resolveSize(diameterPx, widthMeasureSpec),
-                resolveSize(diameterPx, heightMeasureSpec),
+                resolveSize(viewSize, widthMeasureSpec),
+                resolveSize(viewSize, heightMeasureSpec),
             )
         }
 
@@ -136,13 +155,34 @@ class AnalogClockOverlay
             super.onSizeChanged(w, h, oldw, oldh)
             centreX = w / 2f
             centreY = h / 2f
-            faceRadius = (min(w, h) / 2f - edgeInset).coerceAtLeast(0f)
+
+            // The halo fills the view and the face sits in the middle of it
+            haloRadius = min(w, h) / 2f
+            faceRadius = (haloRadius - haloMarginPx - edgeInset).coerceAtLeast(0f)
             sizes = AnalogClockGeometry.forRadius(faceRadius)
+            updateHaloShader()
+        }
+
+        // The gradient is made here, not when drawing, as it only changes with the size or the level
+        private fun updateHaloShader() {
+            if (!halo.isVisible || haloRadius <= 0f) {
+                haloPaint.shader = null
+                return
+            }
+
+            val gradient = AnalogClockHaloMath.gradient(halo)
+            val colours = IntArray(gradient.alphas.size) { Color.argb(gradient.alphas[it], 0, 0, 0) }
+            haloPaint.shader = RadialGradient(centreX, centreY, haloRadius, colours, gradient.positions, Shader.TileMode.CLAMP)
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             if (faceRadius <= 0f) return
+
+            // Behind everything, so the thin lines and their shadow have something dark to stand on
+            if (haloPaint.shader != null) {
+                canvas.drawCircle(centreX, centreY, haloRadius, haloPaint)
+            }
 
             // A soft shadow, as behind the text overlays, keeps the thin lines readable on bright footage
             canvas.withTranslation(shadowOffset, shadowOffset) {
