@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.effects
 
+import com.neilturner.aerialviews.models.enums.SceneType
 import com.neilturner.aerialviews.models.enums.WeatherCondition
 import com.neilturner.aerialviews.models.enums.WeatherEffectsFrameRate
 import com.neilturner.aerialviews.models.enums.WeatherEffectsIntensity
@@ -43,7 +44,8 @@ data class WeatherEffectsSettings(
  *   a typical intensity so the effects can be tried out at any time.
  * - The effects are not seen while a clip loads, so they fade in when it is shown, and out when
  *   the next one loads. On a clip tagged with weather they are not seen at all, if the setting
- *   "Skip on weather clips" is on, as that clip already shows weather, see [WeatherEffectClipRule].
+ *   "Skip on weather clips" is on, as that clip already shows weather. Nor are they on footage from
+ *   space, whatever the settings say, see [WeatherEffectClipRule].
  * - In blackout the view is hidden and everything stops.
  * - When the effects are off in the settings, nothing is done at all: the view is taken out of
  *   the layout, no weather is listened for, and the calls of the screen controller do nothing.
@@ -88,15 +90,23 @@ class WeatherEffectsController(
 
     /**
      * A new clip, or photo, is being loaded. The effects go until it is shown, and stay away if it
-     * is tagged with weather and that is to be skipped.
+     * is tagged with weather and that is to be skipped, or if it is footage from space.
      *
      * @param weatherTags the weather the clip is tagged with, which is empty when it has none
+     * @param scene what the clip shows, which is unknown when it has no scene
      */
-    fun onMediaChanged(weatherTags: Set<WeatherCondition>) {
+    fun onMediaChanged(
+        weatherTags: Set<WeatherCondition>,
+        scene: SceneType = SceneType.UNKNOWN,
+    ) {
         if (!started) return
-        clipAllowed = !WeatherEffectClipRule.shouldSkip(settings.skipOnWeatherClips, weatherTags)
+        clipAllowed = !WeatherEffectClipRule.shouldSkip(settings.skipOnWeatherClips, weatherTags, scene)
         clipShown = false
-        if (!clipAllowed) Timber.i("WeatherEffects: Skipped, the clip is tagged $weatherTags")
+        if (WeatherEffectClipRule.shouldSkipScene(scene)) {
+            Timber.i("WeatherEffects: Skipped, the clip is a $scene scene")
+        } else if (!clipAllowed) {
+            Timber.i("WeatherEffects: Skipped, the clip is tagged $weatherTags")
+        }
         apply()
     }
 

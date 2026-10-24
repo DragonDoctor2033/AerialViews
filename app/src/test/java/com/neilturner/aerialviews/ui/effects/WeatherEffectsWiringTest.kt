@@ -108,9 +108,14 @@ internal class WeatherEffectsWiringTest {
     }
 
     @Test
-    fun `a clip that loads takes the effects away, with its weather tags, where the clip is known`() {
-        assertEquals(1, count("weatherEffects.onMediaChanged(media.metadata.weather)"))
-        assertTrue("weatherEffects.onMediaChanged(media.metadata.weather)" in body("private fun loadItem("))
+    fun `a clip that loads takes the effects away, with its weather tags and its scene, where the clip is known`() {
+        val call = "weatherEffects.onMediaChanged(media.metadata.weather, media.metadata.scene)"
+
+        assertEquals(1, count(call))
+        assertTrue(call in body("private fun loadItem("))
+        // Not the call without the scene, which would not skip footage from space
+        assertEquals(0, count("weatherEffects.onMediaChanged(media.metadata.weather)"))
+        assertEquals(1, count("weatherEffects.onMediaChanged("))
     }
 
     @Test

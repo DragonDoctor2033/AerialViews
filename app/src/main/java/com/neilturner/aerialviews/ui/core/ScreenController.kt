@@ -537,8 +537,9 @@ class ScreenController(
         pauseStartTime = 0
         currentMedia = media
         overlayStateStore.resetForNextMedia()
-        // The screen is black while a clip loads, so the weather effects go now and fade in once it is shown
-        weatherEffects.onMediaChanged(media.metadata.weather)
+        // The screen is black while a clip loads, so the weather effects go now and fade in once it is
+        // shown. They stay away on a clip with weather of its own, and on footage from space
+        weatherEffects.onMediaChanged(media.metadata.weather, media.metadata.scene)
 
         if (media.uri.toString().contains("smb://")) {
             val pattern = Regex("(smb://)([^:]+):([^@]+)@([\\d.]+)/")

@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.effects
 
+import com.neilturner.aerialviews.models.enums.SceneType
 import com.neilturner.aerialviews.models.enums.WeatherCondition
 import com.neilturner.aerialviews.models.enums.WeatherEffectKind
 import com.neilturner.aerialviews.models.enums.WeatherEffectsFrameRate
@@ -77,8 +78,11 @@ internal class WeatherEffectsControllerTest {
     )
 
     // The controller is started, a clip is loaded and shown
-    private fun WeatherEffectsController.playClip(tags: Set<WeatherCondition> = emptySet()) {
-        onMediaChanged(tags)
+    private fun WeatherEffectsController.playClip(
+        tags: Set<WeatherCondition> = emptySet(),
+        scene: SceneType = SceneType.UNKNOWN,
+    ) {
+        onMediaChanged(tags, scene)
         onMediaShown()
     }
 
@@ -255,6 +259,120 @@ internal class WeatherEffectsControllerTest {
 
             assertFalse(surface.last.shown)
             assertTrue(surface.last.rain > 0f)
+        }
+
+    // Footage from space
+
+    @Test
+    fun `a clip from space has no effects, and the weather is still known for the next clip`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            feed.publish(rainy)
+            controller.start()
+
+            controller.playClip(scene = SceneType.SPACE)
+
+            assertFalse(surface.last.shown)
+            assertTrue(surface.last.rain > 0f)
+        }
+
+    @Test
+    fun `footage from space has no effects with the setting for weather clips off, too`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope, settings(skip = false))
+            feed.publish(rainy)
+            controller.start()
+
+            controller.playClip(scene = SceneType.SPACE)
+            assertFalse(surface.last.shown)
+
+            // Where a clip with weather and another scene has them, with the setting off
+            controller.playClip(setOf(WeatherCondition.RAIN), SceneType.NATURE)
+            assertTrue(surface.last.shown)
+        }
+
+    @Test
+    fun `the effects go when a clip from space loads, and stay off while it plays`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            feed.publish(rainy)
+            controller.start()
+            controller.playClip(scene = SceneType.NATURE)
+            assertTrue(surface.last.shown)
+
+            controller.onMediaChanged(emptySet(), SceneType.SPACE)
+            assertFalse(surface.last.shown)
+            controller.onMediaShown()
+            assertFalse(surface.last.shown)
+        }
+
+    @Test
+    fun `a clip from space keeps the effects away when the weather changes, and when the screen comes back from blackout`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            controller.start()
+            controller.playClip(scene = SceneType.SPACE)
+
+            feed.publish(rainy)
+            assertFalse(surface.last.shown)
+            assertTrue(surface.last.rain > 0f)
+
+            controller.setBlackout(true)
+            controller.setBlackout(false)
+            controller.onMediaShown()
+            assertFalse(surface.last.shown)
+        }
+
+    @Test
+    fun `the effects come back on the next clip which is not from space`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            feed.publish(rainy)
+            controller.start()
+            controller.playClip(scene = SceneType.SPACE)
+            assertFalse(surface.last.shown)
+
+            controller.playClip(scene = SceneType.CITY)
+
+            assertTrue(surface.last.shown)
+        }
+
+    @Test
+    fun `only space is skipped, every other scene has the effects, the sea too`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            feed.publish(rainy)
+            controller.start()
+
+            SceneType.entries.forEach { scene ->
+                controller.playClip(scene = scene)
+                assertEquals(scene != SceneType.SPACE, surface.last.shown, "$scene")
+            }
+            controller.playClip(scene = SceneType.SEA)
+            assertTrue(surface.last.shown, "coasts are in the sea scene, and rain is fine there")
+        }
+
+    @Test
+    fun `a clip with no scene, and a photo, has the effects`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+            feed.publish(rainy)
+            controller.start()
+
+            controller.onMediaChanged(emptySet())
+            controller.onMediaShown()
+
+            assertTrue(surface.last.shown)
+        }
+
+    @Test
+    fun `before it is started a clip from space does nothing`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller = controller(backgroundScope)
+
+            controller.onMediaChanged(emptySet(), SceneType.SPACE)
+
+            assertTrue(surface.targets.isEmpty())
         }
 
     // The weather

@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.effects
 
+import com.neilturner.aerialviews.models.enums.SceneType
 import com.neilturner.aerialviews.models.enums.WeatherCondition
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -194,5 +195,57 @@ internal class WeatherEffectsRefreshTest {
             assertFalse(WeatherEffectClipRule.shouldSkip(false, setOf(condition)), "$condition")
         }
         assertFalse(WeatherEffectClipRule.shouldSkip(false, WeatherCondition.entries.toSet()))
+    }
+
+    // The rule of footage from space
+
+    @Test
+    fun `footage from space is skipped`() {
+        assertTrue(WeatherEffectClipRule.shouldSkipScene(SceneType.SPACE))
+    }
+
+    @Test
+    fun `no other scene is skipped, and the sea, which includes coasts, is not`() {
+        SceneType.entries.filter { it != SceneType.SPACE }.forEach { scene ->
+            assertFalse(WeatherEffectClipRule.shouldSkipScene(scene), "$scene")
+        }
+        assertFalse(WeatherEffectClipRule.shouldSkipScene(SceneType.SEA))
+        assertFalse(WeatherEffectClipRule.shouldSkipScene(SceneType.BEACH))
+        assertFalse(WeatherEffectClipRule.shouldSkipScene(SceneType.UNKNOWN), "photos and clips with no scene get effects")
+    }
+
+    @Test
+    fun `footage from space is skipped whatever the setting is, and whatever it is tagged with`() {
+        for (setting in listOf(true, false)) {
+            assertTrue(WeatherEffectClipRule.shouldSkip(setting, emptySet(), SceneType.SPACE), "setting $setting")
+            WeatherCondition.entries.forEach { condition ->
+                assertTrue(WeatherEffectClipRule.shouldSkip(setting, setOf(condition), SceneType.SPACE), "$setting $condition")
+            }
+        }
+    }
+
+    @Test
+    fun `a clip of another scene is skipped by its weather tags and the setting, as before`() {
+        for (scene in SceneType.entries.filter { it != SceneType.SPACE }) {
+            assertTrue(WeatherEffectClipRule.shouldSkip(true, setOf(WeatherCondition.RAIN), scene), "$scene")
+            assertFalse(WeatherEffectClipRule.shouldSkip(false, setOf(WeatherCondition.RAIN), scene), "$scene")
+            assertFalse(WeatherEffectClipRule.shouldSkip(true, emptySet(), scene), "$scene")
+            assertFalse(WeatherEffectClipRule.shouldSkip(false, emptySet(), scene), "$scene")
+        }
+    }
+
+    @Test
+    fun `the rule with a scene is the two rules together`() {
+        for (setting in listOf(true, false)) {
+            for (tags in listOf(emptySet(), setOf(WeatherCondition.FOG), WeatherCondition.entries.toSet())) {
+                for (scene in SceneType.entries) {
+                    assertEquals(
+                        WeatherEffectClipRule.shouldSkip(setting, tags) || WeatherEffectClipRule.shouldSkipScene(scene),
+                        WeatherEffectClipRule.shouldSkip(setting, tags, scene),
+                        "$setting $tags $scene",
+                    )
+                }
+            }
+        }
     }
 }

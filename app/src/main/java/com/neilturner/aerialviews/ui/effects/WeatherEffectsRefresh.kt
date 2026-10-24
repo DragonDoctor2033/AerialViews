@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.effects
 
+import com.neilturner.aerialviews.models.enums.SceneType
 import com.neilturner.aerialviews.models.enums.WeatherCondition
 
 /**
@@ -47,12 +48,19 @@ object WeatherEffectsRefresh {
 }
 
 /**
- * The rule of the setting "Skip on weather clips", kept free of android classes so it can be unit
- * tested on the JVM. A clip tagged with weather already shows that weather, rain on top of a rain
- * clip would be too much, so the effects go while it plays.
+ * The rules of which clips get the weather effects, kept free of android classes so they can be unit
+ * tested on the JVM.
+ *
+ * - A clip tagged with weather already shows that weather, rain on top of a rain clip would be too
+ *   much, so the effects go while it plays. That is the setting "Skip on weather clips".
+ * - Footage from space never has effects, whatever the settings say. Rain or snow over the Earth
+ *   seen from orbit looks wrong. Only the scene space counts: the sea includes coasts, where rain
+ *   is fine.
  */
 object WeatherEffectClipRule {
     /**
+     * The rule of the setting "Skip on weather clips"
+     *
      * @param skipOnWeatherClips the setting
      * @param tags the weather the clip is tagged with, which is empty for a clip with no weather in it
      * and for photos. Any tag counts, also one which differs from the weather outside
@@ -61,4 +69,14 @@ object WeatherEffectClipRule {
         skipOnWeatherClips: Boolean,
         tags: Set<WeatherCondition>,
     ): Boolean = skipOnWeatherClips && tags.isNotEmpty()
+
+    /** Footage from space has no effects, which no setting changes. The scene of a photo is unknown */
+    fun shouldSkipScene(scene: SceneType): Boolean = scene == SceneType.SPACE
+
+    /** Does the clip go without effects: because of its weather tags and the setting, or because of its scene? */
+    fun shouldSkip(
+        skipOnWeatherClips: Boolean,
+        tags: Set<WeatherCondition>,
+        scene: SceneType,
+    ): Boolean = shouldSkip(skipOnWeatherClips, tags) || shouldSkipScene(scene)
 }
