@@ -31,6 +31,7 @@ class WeatherService(
     val context: Context,
     private val apiOverride: OpenWeatherApi? = null,
     private val conditionCache: WeatherConditionCache = WeatherConditionCache.shared,
+    private val effectsFeed: WeatherEffectsFeed = WeatherEffectsFeed.shared,
 ) {
     private var updateJob: Job? = null
     private val maxRetries = 3
@@ -213,6 +214,8 @@ class WeatherService(
                 )
             // Let the playlist know too, so it does not have to ask for the same weather again
             response?.weather?.firstOrNull()?.let { conditionCache.putOpenWeatherId(it.id) }
+            // The weather effects want the numbers behind the overlay text, even if no overlay is shown
+            response?.let { WeatherSnapshot.from(it, config.units) }?.let { effectsFeed.publish(it) }
             weatherEvent =
                 response?.let {
                     mapCurrentWeatherResponse(

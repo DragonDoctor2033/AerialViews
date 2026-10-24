@@ -85,13 +85,40 @@ data class Wind(
     val deg: Int,
 )
 
-// Current Weather
+// Rain or snow, in mm of water. The API names the keys "1h" and "3h", which are no identifiers
+@Serializable
+data class Precipitation(
+    @SerialName("1h") val oneHour: Double? = null,
+    @SerialName("3h") val threeHours: Double? = null,
+) {
+    /** The volume of the last hour, or a third of the last three hours when only those are known */
+    fun mmPerHour(): Double? = oneHour ?: threeHours?.div(3.0)
+}
+
+@Serializable
+data class Clouds(
+    val all: Int? = null,
+)
+
+// The "sys" part of the answer also has the country, which is not read
+@Serializable
+data class SunTimes(
+    val sunrise: Long? = null,
+    val sunset: Long? = null,
+)
+
+// Current Weather. Everything after the name is optional, as the API leaves out rain, snow and
+// clouds when there are none, so that an answer without them still parses
 @Serializable
 data class CurrentWeatherResponse(
     val weather: List<Weather>,
     val main: MainWeatherData,
     val wind: Wind,
     val name: String,
+    val rain: Precipitation? = null,
+    val snow: Precipitation? = null,
+    val clouds: Clouds? = null,
+    val sys: SunTimes? = null,
 )
 
 // 5 Day Forecast
