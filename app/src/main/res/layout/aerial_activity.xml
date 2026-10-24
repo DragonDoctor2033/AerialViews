@@ -12,6 +12,14 @@
         android:id="@+id/image_view"
         layout="@layout/image_view" />
 
+    <!-- The weather over the video and photos, below the overlays. Taken out of the layout when it is off -->
+    <com.neilturner.aerialviews.ui.effects.WeatherEffectsView
+        android:id="@+id/weather_effects"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
     <include
         android:id="@+id/overlay_view"
         layout="@layout/overlay_view" />

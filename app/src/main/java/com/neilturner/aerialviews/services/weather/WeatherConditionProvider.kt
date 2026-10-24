@@ -128,6 +128,7 @@ internal class OpenWeatherConditionFetcher(
     private val longitude: () -> Double? = { GeneralPrefs.weatherLocationLon.toDoubleOrNull() },
     private val timeout: Duration = REQUEST_TIMEOUT,
     private val api: Lazy<OpenWeatherApi> = lazy { buildApi(timeout) },
+    private val effectsFeed: WeatherEffectsFeed = WeatherEffectsFeed.shared,
 ) {
     suspend fun fetchConditionId(): Int? {
         val key = apiKey()
@@ -147,8 +148,11 @@ internal class OpenWeatherConditionFetcher(
             withTimeoutOrNull(timeout) {
                 val response = api.value.getCurrentWeather(lat = lat, lon = lon, apiKey = key)
                 if (response.isSuccessful) {
-                    response
-                        .body()
+                    val body = response.body()
+                    // The weather effects get this look too (in metric units, the default of the request),
+                    // so they follow the weather as often as the playlist does, and know it at the start
+                    body?.let { WeatherSnapshot.from(it, units = "metric") }?.let { effectsFeed.publish(it) }
+                    body
                         ?.weather
                         ?.firstOrNull()
                         ?.id

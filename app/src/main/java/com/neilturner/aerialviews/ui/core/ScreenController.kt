@@ -45,6 +45,7 @@ import com.neilturner.aerialviews.ui.controls.ProgressBarEvent
 import com.neilturner.aerialviews.ui.controls.ProgressState
 import com.neilturner.aerialviews.ui.core.ImagePlayerView.OnImagePlayerEventListener
 import com.neilturner.aerialviews.ui.core.VideoPlayerView.OnVideoPlayerEventListener
+import com.neilturner.aerialviews.ui.effects.WeatherEffectsController
 import com.neilturner.aerialviews.ui.helpers.ColourHelper
 import com.neilturner.aerialviews.ui.helpers.FontHelper
 import com.neilturner.aerialviews.ui.helpers.GradientHelper
@@ -144,6 +145,7 @@ class ScreenController(
     private val gradientBottomView: View
     private val progressBarView: ProgressBar
     private val notificationContainer: ViewGroup
+    private val weatherEffects: WeatherEffectsController
     val view: View
 
     private val topLeftIds: List<Int>
@@ -205,6 +207,10 @@ class ScreenController(
         brightnessView = binding.brightnessView
         progressBarView = binding.progressBar
         notificationContainer = view.findViewById(R.id.notification_container)
+
+        // The weather over the video, below the overlays. When it is off in the settings it does nothing
+        weatherEffects = WeatherEffectsController(binding.weatherEffects, mainScope)
+        weatherEffects.start()
 
         // Setup loading message or hide it
         if (GeneralPrefs.showLoadingText) {
@@ -330,11 +336,13 @@ class ScreenController(
             // Setup weather service
             val hasWeatherNowOverlay = overlayHelper.findOverlay<WeatherNowOverlay>().isNotEmpty()
             val hasForecastOverlay = overlayHelper.findOverlay<WeatherForecastOverlay>().isNotEmpty()
-            if (hasWeatherNowOverlay || hasForecastOverlay) {
+            // The weather effects need the current weather too, whether or not an overlay shows it
+            val needsCurrentWeather = hasWeatherNowOverlay || weatherEffects.needsWeather
+            if (needsCurrentWeather || hasForecastOverlay) {
                 weatherService =
                     WeatherService(context).apply {
                         startUpdates(
-                            fetchCurrentWeather = hasWeatherNowOverlay,
+                            fetchCurrentWeather = needsCurrentWeather,
                             fetchForecast = hasForecastOverlay,
                         )
                     }
@@ -529,6 +537,8 @@ class ScreenController(
         pauseStartTime = 0
         currentMedia = media
         overlayStateStore.resetForNextMedia()
+        // The screen is black while a clip loads, so the weather effects go now and fade in once it is shown
+        weatherEffects.onMediaChanged(media.metadata.weather)
 
         if (media.uri.toString().contains("smb://")) {
             val pattern = Regex("(smb://)([^:]+):([^@]+)@([\\d.]+)/")
@@ -598,6 +608,8 @@ class ScreenController(
     private fun fadeInNextItem() {
         if (blackOutMode) return
 
+        // The clip is on its way in, so the weather effects fade in with it
+        weatherEffects.onMediaShown()
         savePlaybackPosition()
 
         canShowOverlays = false
@@ -950,6 +962,7 @@ class ScreenController(
         if (isStopped) return
         isStopped = true
 
+        weatherEffects.stop()
         if (GeneralPrefs.playlistCache) {
             // ExoPlayer must be accessed on the main thread
             val trackIndex = musicPlayer?.getCurrentTrackIndex() ?: 0
@@ -1029,6 +1042,7 @@ class ScreenController(
         progressBarView.visibility = View.INVISIBLE
         brightnessView.visibility = View.INVISIBLE
         notificationContainer.visibility = View.INVISIBLE
+        weatherEffects.setBlackout(true)
         musicPlayer?.pause()
     }
 
@@ -1042,6 +1056,7 @@ class ScreenController(
         brightnessView.visibility =
             if (GeneralPrefs.videoBrightness == "100") View.GONE else View.VISIBLE
         notificationContainer.visibility = View.VISIBLE
+        weatherEffects.setBlackout(false)
         loadNextItem()
         musicPlayer?.resume()
         scheduleSleepTimer()
