@@ -60,7 +60,7 @@ internal class WeatherEffectsControllerTest {
         enabled: Boolean = true,
         intensity: WeatherEffectsIntensity = WeatherEffectsIntensity.NORMAL,
         skip: Boolean = true,
-        frameRate: WeatherEffectsFrameRate = WeatherEffectsFrameRate.FPS_60,
+        frameRate: WeatherEffectsFrameRate = WeatherEffectsFrameRate.DEFAULT,
     ) = WeatherEffectsSettings(enabled, intensity, skip, frameRate)
 
     private fun controller(
@@ -117,10 +117,17 @@ internal class WeatherEffectsControllerTest {
         }
 
     @Test
-    fun `the default frame rate is 60`() =
+    fun `60 frames a second can still be picked and are handed to the view`() =
+        runTest(UnconfinedTestDispatcher()) {
+            controller(backgroundScope, settings(frameRate = WeatherEffectsFrameRate.FPS_60)).start()
+            assertEquals(60, surface.framesPerSecond)
+        }
+
+    @Test
+    fun `the default frame rate is 30`() =
         runTest(UnconfinedTestDispatcher()) {
             controller(backgroundScope).start()
-            assertEquals(60, surface.framesPerSecond)
+            assertEquals(30, surface.framesPerSecond)
         }
 
     @Test

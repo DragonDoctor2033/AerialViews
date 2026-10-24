@@ -1,6 +1,8 @@
 package com.neilturner.aerialviews.models.enums
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 internal class WeatherEffectsFrameRateTest {
@@ -18,15 +20,24 @@ internal class WeatherEffectsFrameRateTest {
     }
 
     @Test
-    fun `missing or unknown values fall back to 60`() {
-        listOf(null, "", " ", "60", "fps_30", "FPS_24", "30").forEach { value ->
-            assertEquals(WeatherEffectsFrameRate.FPS_60, WeatherEffectsFrameRate.fromValue(value), "value '$value'")
+    fun `missing or unknown values fall back to 30`() {
+        listOf(null, "", " ", "60", "fps_60", "FPS_24", "30").forEach { value ->
+            assertEquals(WeatherEffectsFrameRate.FPS_30, WeatherEffectsFrameRate.fromValue(value), "value '$value'")
         }
     }
 
     @Test
-    fun `60 frames a second is the default`() {
-        assertEquals(WeatherEffectsFrameRate.FPS_60, WeatherEffectsFrameRate.DEFAULT)
+    fun `30 frames a second is the default`() {
+        assertEquals(WeatherEffectsFrameRate.FPS_30, WeatherEffectsFrameRate.DEFAULT)
+        assertEquals(30, WeatherEffectsFrameRate.DEFAULT.fps)
+    }
+
+    @Test
+    fun `60 frames a second can still be picked, and is not mixed up with the default`() {
+        assertEquals(WeatherEffectsFrameRate.FPS_60, WeatherEffectsFrameRate.fromValue("FPS_60"))
+        assertEquals(60, WeatherEffectsFrameRate.fromValue("FPS_60").fps)
+        assertTrue(WeatherEffectsFrameRate.FPS_60 in WeatherEffectsFrameRate.entries)
+        assertNotEquals(WeatherEffectsFrameRate.DEFAULT, WeatherEffectsFrameRate.FPS_60)
     }
 
     @Test

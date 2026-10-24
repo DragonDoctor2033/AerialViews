@@ -167,13 +167,25 @@ internal class WeatherEffectsSettingsTest {
     }
 
     @Test
-    fun `frame rate is 60 by default`() {
+    fun `frame rate is 30 by default`() {
         val rate = ResourceXml.preference(screen, WeatherEffectsPrefs.KEY_FRAME_RATE)
         val default = ResourceXml.strings(strings).getValue("weather_effects_frame_rate_default")
 
         assertEquals("@string/weather_effects_frame_rate_default", rate.getAttribute("app:defaultValue"))
-        assertEquals("FPS_60", default)
+        assertEquals("FPS_30", default)
         assertEquals(WeatherEffectsFrameRate.DEFAULT.name, default)
+    }
+
+    @Test
+    fun `the 30 frames are the one with the star in both languages, and 60 can still be picked`() {
+        val values = ResourceXml.stringArray(strings, "weather_effects_frame_rate_values")
+        val entries = ResourceXml.stringArray(strings, "weather_effects_frame_rate_entries").map { it.removePrefix("@string/") }
+
+        listOf(ResourceXml.strings(strings), ResourceXml.strings(russianStrings)).forEach { texts ->
+            assertTrue(texts.getValue(entries[values.indexOf("FPS_30")]).endsWith("*"))
+            assertTrue(!texts.getValue(entries[values.indexOf("FPS_60")]).contains("*"))
+        }
+        assertTrue("FPS_60" in values)
     }
 
     @Test

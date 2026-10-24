@@ -792,7 +792,7 @@ Aerial Views can draw the weather over the video, so the usual footage looks lik
 * By night everything is dimmer. A change of the weather is a crossfade of about two seconds, and the effects fade in when a clip starts and go when it ends, in the dark between two clips and in blackout.
 * `Intensity` (Subtle, Normal or Strong) scales how much there is.
 * `Skip on weather clips` (on by default) hides the effects while a video tagged with weather is playing, such as a `rain` clip, as it already shows that weather. See [weather-matched videos](#weather-matched-videos) for the tags. Photos and videos without a weather tag always get the effects.
-* `Frame rate` is 60 frames a second by default, and 30 is lighter on the device. The effects stop completely when there is nothing that moves, such as under overcast skies once the grey tone has faded in, when the screen is in blackout, and when the effects are off, which costs nothing and does not look up the weather.
+* `Frame rate` is 30 frames a second by default, which is light on the device, and 60 is smoother. The effects stop completely when there is nothing that moves, such as under overcast skies once the grey tone has faded in, when the screen is in blackout, and when the effects are off, which costs nothing and does not look up the weather.
 
 Use `Weather override (testing)` under `Settings > Playlist > Weather matching` (it can be changed when `Match videos to the current weather` is on) to try any weather on demand. The effects follow it too, at a typical intensity.
 

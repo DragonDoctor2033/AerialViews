@@ -29,8 +29,8 @@
     <string name="weather_effects_skip_title">Skip on weather clips</string>
     <string name="weather_effects_skip_summary">Hide the effects while a video tagged with weather, such as rain, is playing, as it already shows that weather. The tags are set under Weather matching in the Playlist settings</string>
     <string name="weather_effects_frame_rate_title">Frame rate</string>
-    <string name="weather_effects_frame_rate_60">60 frames per second*</string>
-    <string name="weather_effects_frame_rate_30">30 frames per second (lighter)</string>
+    <string name="weather_effects_frame_rate_60">60 frames per second (smoother)</string>
+    <string name="weather_effects_frame_rate_30">30 frames per second (lighter)*</string>
     <string-array name="weather_effects_frame_rate_entries" translatable="false">
         <item>@string/weather_effects_frame_rate_60</item>
         <item>@string/weather_effects_frame_rate_30</item>
@@ -39,5 +39,5 @@
         <item>FPS_60</item>
         <item>FPS_30</item>
     </string-array>
-    <string name="weather_effects_frame_rate_default" translatable="false">FPS_60</string>
+    <string name="weather_effects_frame_rate_default" translatable="false">FPS_30</string>
 </resources>
