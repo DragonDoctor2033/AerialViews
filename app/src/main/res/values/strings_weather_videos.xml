@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main / Settings / Playlist / Weather matching -->
+    <string name="weather_videos_category">Weather matching</string>
+
+    <string name="weather_videos_match_title">Match videos to the current weather</string>
+    <string name="weather_videos_match_summary">Prefer videos that suit the weather outside. Put the weather in folder or file names: clear, cloudy, rain, snow, storm or fog (e.g. Weather/rain/night/forest.mp4 or beach_clear_day.mp4). Videos without a weather name are used when nothing matches. Uses the location set under Time of Day.</string>
+
+    <string name="weather_videos_override_title">Weather override (testing)</string>
+
+    <string name="weather_videos_override_off">Off</string>
+    <string name="weather_videos_override_clear">Clear</string>
+    <string name="weather_videos_override_cloudy">Cloudy</string>
+    <string name="weather_videos_override_rain">Rain</string>
+    <string name="weather_videos_override_snow">Snow</string>
+    <string name="weather_videos_override_storm">Storm</string>
+    <string name="weather_videos_override_fog">Fog</string>
+
+    <string-array name="weather_videos_override_entries" translatable="false">
+        <item>@string/weather_videos_override_off</item>
+        <item>@string/weather_videos_override_clear</item>
+        <item>@string/weather_videos_override_cloudy</item>
+        <item>@string/weather_videos_override_rain</item>
+        <item>@string/weather_videos_override_snow</item>
+        <item>@string/weather_videos_override_storm</item>
+        <item>@string/weather_videos_override_fog</item>
+    </string-array>
+    <string-array name="weather_videos_override_values" translatable="false">
+        <item>OFF</item>
+        <item>CLEAR</item>
+        <item>CLOUDY</item>
+        <item>RAIN</item>
+        <item>SNOW</item>
+        <item>STORM</item>
+        <item>FOG</item>
+    </string-array>
+    <string name="weather_videos_override_default" translatable="false">OFF</string>
+</resources>

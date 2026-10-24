@@ -68,6 +68,24 @@
                     app:fragment="com.neilturner.aerialviews.ui.settings.LocationFragment" />
         </PreferenceCategory>
 
+        <PreferenceCategory app:title="@string/weather_videos_category">
+                <SwitchPreference
+                    app:defaultValue="false"
+                    app:key="playlist_weather_match"
+                    app:summary="@string/weather_videos_match_summary"
+                    app:title="@string/weather_videos_match_title" />
+
+                <ListPreference
+                    app:defaultValue="@string/weather_videos_override_default"
+                    app:dependency="playlist_weather_match"
+                    app:entries="@array/weather_videos_override_entries"
+                    app:entryValues="@array/weather_videos_override_values"
+                    app:key="playlist_weather_override"
+                    app:title="@string/weather_videos_override_title"
+                    app:useSimpleSummaryProvider="true"
+                    app:dialogTitle="@string/weather_videos_override_title" />
+        </PreferenceCategory>
+
         <PreferenceCategory app:title="@string/category_photos">
                 <ListPreference
                     app:defaultValue="@string/slideshow_speed_default"
