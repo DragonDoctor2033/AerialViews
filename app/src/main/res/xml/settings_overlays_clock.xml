@@ -13,6 +13,12 @@
 
                 <CheckBoxPreference
                     app:defaultValue="false"
+                    app:key="clock_show_seconds"
+                    app:summary="@string/appearance_clock_show_seconds_summary"
+                    app:title="@string/appearance_clock_show_seconds_title" />
+
+                <CheckBoxPreference
+                    app:defaultValue="false"
                     app:key="clock_force_latin_digits"
                     app:summary="@string/appearance_show_force_latin_digits_summary"
                     app:title="@string/appearance_show_force_latin_digits_title" />

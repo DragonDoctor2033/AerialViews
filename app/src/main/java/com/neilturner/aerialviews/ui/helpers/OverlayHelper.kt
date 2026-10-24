@@ -13,6 +13,7 @@ import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.enums.OverlayType
 import com.neilturner.aerialviews.models.enums.SlotType
 import com.neilturner.aerialviews.models.prefs.AnalogClockPrefs
+import com.neilturner.aerialviews.models.prefs.ClockPrefs
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
 import com.neilturner.aerialviews.ui.overlays.AnalogClockOverlay
 import com.neilturner.aerialviews.ui.overlays.ClockOverlay
@@ -199,7 +200,7 @@ class OverlayHelper(
 
         // For each overlay loaded, update its prefs
         findOverlay<ClockOverlay>().forEach {
-            it.updateFormat(prefs.clockFormat)
+            it.updateFormat(prefs.clockFormat, ClockPrefs.showSeconds)
         }
         findOverlay<DateOverlay>().forEach {
             it.updateFormat(prefs.dateFormat, prefs.dateCustom)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation" tools:locale="en">
+
+    <!-- Options of the digital clock overlay which the app itself does not have. Kept apart from strings.xml -->
+
+    <!-- Main / Settings / Overlays / Clock -->
+    <string name="appearance_clock_show_seconds_title">Show seconds</string>
+    <string name="appearance_clock_show_seconds_summary">Show the time with seconds, such as 14:05:09 instead of 14:05</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <string name="appearance_clock_show_seconds_summary">Показывать время с секундами, например 14:05:09 вместо 14:05</string>
+  <string name="appearance_clock_show_seconds_title">Показывать секунды</string>
+</resources>
