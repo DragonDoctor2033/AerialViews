@@ -130,6 +130,13 @@ android {
             keyAlias = releaseProps["keyAlias"] as String?
             keyPassword = releaseProps["keyPassword"] as String?
         }
+        create("weather") {
+            val weatherProps = loadProperties("signing/weather.properties")
+            storeFile = weatherProps["storeFile"]?.let { file(it) }
+            storePassword = weatherProps["storePassword"] as String?
+            keyAlias = weatherProps["keyAlias"] as String?
+            keyPassword = weatherProps["keyPassword"] as String?
+        }
     }
 
     flavorDimensions += "version"
@@ -167,6 +174,18 @@ android {
                 setInstrumentationEnabled(false)
             }
         }
+        // Personal fork build: its own package so it installs next to the store version, signed
+        // with a local key, and without Firebase like the F-Droid flavor
+        create("weather") {
+            signingConfig = signingConfigs.getByName("weather")
+            dimension = "version"
+            applicationId = "com.neilturner.aerialviews.weather"
+            versionNameSuffix = "-weather"
+
+            extensions.configure<com.google.firebase.perf.plugin.FirebasePerfExtension> {
+                setInstrumentationEnabled(false)
+            }
+        }
     }
 
     // Using this method https://stackoverflow.com/a/30548238/247257
@@ -177,6 +196,7 @@ android {
         getByName("googleplaybeta").kotlin.directories.add("src/common/java")
         getByName("amazon").kotlin.directories.add("src/common/java")
         getByName("fdroid").kotlin.directories.add("src/fdroid/java")
+        getByName("weather").kotlin.directories.add("src/fdroid/java")
     }
 
     compileOptions {
@@ -244,6 +264,14 @@ dependencies {
     implementation(project(":projectivyapi"))
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+}
+
+// google-services.json only lists the upstream package names, and the weather flavor has no
+// Firebase anyway, so skip google-services processing and Crashlytics tasks for it
+tasks.configureEach {
+    if (name.contains("Weather") && (name.contains("GoogleServices") || name.contains("Crashlytics"))) {
+        enabled = false
+    }
 }
 
 tasks.withType<Test>().configureEach {
