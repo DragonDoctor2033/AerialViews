@@ -20,6 +20,7 @@ import com.neilturner.aerialviews.models.prefs.SambaProviderPreferences
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.providers.MediaProvider
 import com.neilturner.aerialviews.providers.ProviderFetchResult
+import com.neilturner.aerialviews.utils.MediaTagParser
 import com.neilturner.aerialviews.utils.aerialMediaTypeFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -247,6 +248,8 @@ class SambaMediaProvider(
 
             val item = AerialMedia(uri, type = type)
             item.source = AerialMediaSource.SAMBA
+            // Tag from the share and folder names only, never the host name or login in the uri
+            MediaTagParser.applyPathTags(item.metadata, "$shareName/$filename")
             media.add(item)
         }
 

@@ -11,6 +11,7 @@ import com.neilturner.aerialviews.models.enums.SearchType
 import com.neilturner.aerialviews.models.music.MusicTrack
 import com.neilturner.aerialviews.models.prefs.LocalProviderPreferences
 import com.neilturner.aerialviews.models.videos.AerialMedia
+import com.neilturner.aerialviews.utils.MediaTagParser
 import com.neilturner.aerialviews.utils.aerialMediaTypeFor
 import com.neilturner.aerialviews.utils.filename
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +101,7 @@ class LocalMediaProvider(
             val type = aerialMediaTypeFor(file) ?: continue
             val item = AerialMedia(file.toUri(), type = type)
             item.source = AerialMediaSource.LOCAL
+            MediaTagParser.applyPathTags(item.metadata, file)
             media.add(item)
         }
 
@@ -219,6 +221,7 @@ class LocalMediaProvider(
             val type = aerialMediaTypeFor(uri.filename) ?: continue
             val item = AerialMedia(uri, type = type)
             item.source = AerialMediaSource.LOCAL
+            MediaTagParser.applyPathTags(item.metadata, file)
             media.add(item)
         }
         filtered = selected.size - media.size

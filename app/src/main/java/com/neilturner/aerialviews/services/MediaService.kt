@@ -11,6 +11,7 @@ import com.neilturner.aerialviews.models.enums.AerialMediaSource
 import com.neilturner.aerialviews.models.enums.AerialMediaType
 import com.neilturner.aerialviews.models.enums.ProviderSourceType
 import com.neilturner.aerialviews.models.enums.TimeOfDay
+import com.neilturner.aerialviews.models.enums.WeatherCondition
 import com.neilturner.aerialviews.models.music.MusicPlaylist
 import com.neilturner.aerialviews.models.prefs.AmazonVideoPrefs
 import com.neilturner.aerialviews.models.prefs.AppleVideoPrefs
@@ -24,6 +25,7 @@ import com.neilturner.aerialviews.models.prefs.MusicPrefs
 import com.neilturner.aerialviews.models.prefs.NCMemoriesMediaPrefs
 import com.neilturner.aerialviews.models.prefs.SambaMediaPrefs
 import com.neilturner.aerialviews.models.prefs.SambaMediaPrefs2
+import com.neilturner.aerialviews.models.prefs.WeatherVideoPrefs
 import com.neilturner.aerialviews.models.prefs.WebDavMediaPrefs
 import com.neilturner.aerialviews.models.prefs.WebDavMediaPrefs2
 import com.neilturner.aerialviews.models.videos.AerialMedia
@@ -41,8 +43,11 @@ import com.neilturner.aerialviews.providers.webdav.WebDavMediaProvider
 import com.neilturner.aerialviews.services.MediaServiceHelper.addMetadataToManifestVideos
 import com.neilturner.aerialviews.services.MediaServiceHelper.buildProviderContent
 import com.neilturner.aerialviews.services.MediaServiceHelper.weightedInterleavedShuffle
+import com.neilturner.aerialviews.services.weather.WeatherConditionProvider
+import com.neilturner.aerialviews.services.weather.WeatherMediaFilter
 import com.neilturner.aerialviews.utils.FirebaseHelper
 import com.neilturner.aerialviews.utils.filename
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -52,6 +57,8 @@ class MediaService(
     private val providers: MutableList<MediaProvider> = mutableListOf(),
     private val config: Config = Config.fromPreferences(),
     private val hashFn: (() -> String)? = null,
+    // The weather outside, or null when it is not known. Only asked for when matching to the weather.
+    private val currentWeather: suspend () -> WeatherCondition? = { WeatherConditionProvider.create().currentCondition() },
 ) {
     data class Config(
         val removeDuplicates: Boolean,
@@ -64,6 +71,7 @@ class MediaService(
         val shuffleMusic: Boolean,
         val repeatMusic: Boolean,
         val wifiOnly: Boolean = false,
+        val weatherMatch: Boolean = false,
     ) {
         companion object {
             fun fromPreferences() =
@@ -78,11 +86,15 @@ class MediaService(
                     shuffleMusic = MusicPrefs.shuffle,
                     repeatMusic = MusicPrefs.repeat,
                     wifiOnly = GeneralPrefs.wifiOnly,
+                    weatherMatch = WeatherVideoPrefs.matchWeather,
                 )
         }
     }
 
-    private fun buildCompositeHash(filterRemote: Boolean): String {
+    private fun buildCompositeHash(
+        filterRemote: Boolean,
+        weatherKey: String?,
+    ): String {
         val generalParts =
             buildList {
                 add(GeneralPrefs.removeDuplicates.toString())
@@ -98,6 +110,9 @@ class MediaService(
                 // The derived network mode, not just the wifiOnly setting: the cache holds exactly
                 // the playlist that will be played, so crossing the WiFi boundary must invalidate it.
                 add(filterRemote.toString())
+                // The setting and the condition the playlist was filtered for, so that a change of
+                // weather builds a new playlist instead of resuming one made for the old weather.
+                weatherKey?.let { add(it) }
             }
         val generalHash = generalParts.joinToString("|")
 
@@ -129,7 +144,12 @@ class MediaService(
             val filterRemote = config.wifiOnly && !NetworkHelper.isOnWifiOrEthernet(context)
             Timber.i("MediaService: Network: $networkType | WiFi-only mode: ${config.wifiOnly} | Filtering remote sources: $filterRemote")
 
-            val settingsHash = hashFn?.invoke() ?: buildCompositeHash(filterRemote)
+            // Needed before the cache is checked, as a playlist filtered for other weather is not valid
+            val weatherCondition = if (config.weatherMatch) lookUpWeather() else null
+
+            val settingsHash =
+                hashFn?.invoke()
+                    ?: buildCompositeHash(filterRemote, WeatherMediaFilter.cacheKey(config.weatherMatch, weatherCondition))
             val cacheRepo =
                 if (config.playlistCache) {
                     PlaylistCacheRepository(context)
@@ -257,6 +277,14 @@ class MediaService(
                 Timber.i("Media items after time filtering: ${filteredMedia.size}")
             }
 
+            // After the time of day, so that night clips for the rain are not played during the day
+            if (weatherCondition != null) {
+                val videosBefore = filteredMedia.count { it.type == AerialMediaType.VIDEO }
+                filteredMedia = WeatherMediaFilter.filter(filteredMedia, weatherCondition)
+                val videosAfter = filteredMedia.count { it.type == AerialMediaType.VIDEO }
+                Timber.i("Weather filtering for $weatherCondition: videos $videosBefore -> $videosAfter")
+            }
+
             if (config.shuffleVideos) {
                 filteredMedia = weightedInterleavedShuffle(filteredMedia)
                 Timber.i("Shuffling media items with weighted source interleaving")
@@ -310,6 +338,17 @@ class MediaService(
                 mediaPlaylist = MediaPlaylist(filteredMedia),
                 musicPlaylist = musicPlaylist,
             )
+        }
+
+    /** The weather outside, or null if it cannot be found. This must never stop the playlist being built. */
+    private suspend fun lookUpWeather(): WeatherCondition? =
+        try {
+            currentWeather().also { Timber.i("MediaService: Matching to the weather, current condition: ${it ?: "unknown"}") }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "MediaService: Could not look up the weather, not matching videos to it")
+            null
         }
 
     private fun trackMediaUsage(media: List<AerialMedia>) {

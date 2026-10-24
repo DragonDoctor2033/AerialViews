@@ -30,6 +30,7 @@ import kotlin.time.Duration.Companion.seconds
 class WeatherService(
     val context: Context,
     private val apiOverride: OpenWeatherApi? = null,
+    private val conditionCache: WeatherConditionCache = WeatherConditionCache.shared,
 ) {
     private var updateJob: Job? = null
     private val maxRetries = 3
@@ -210,6 +211,8 @@ class WeatherService(
                     config = config,
                     attempt = 0,
                 )
+            // Let the playlist know too, so it does not have to ask for the same weather again
+            response?.weather?.firstOrNull()?.let { conditionCache.putOpenWeatherId(it.id) }
             weatherEvent =
                 response?.let {
                     mapCurrentWeatherResponse(

@@ -7,6 +7,7 @@ import com.neilturner.aerialviews.models.prefs.ImmichAssetPrefs
 import com.neilturner.aerialviews.models.videos.AerialExifMetadata
 import com.neilturner.aerialviews.models.videos.AerialMedia
 import com.neilturner.aerialviews.models.videos.AerialMediaMetadata
+import com.neilturner.aerialviews.utils.MediaTagParser
 import timber.log.Timber
 
 class ImmichAssetMapper(
@@ -67,6 +68,8 @@ class ImmichAssetMapper(
                     ).apply {
                         source = AerialMediaSource.IMMICH
                         type = if (isVideo) AerialMediaType.VIDEO else AerialMediaType.IMAGE
+                        // The uri only holds an asset id, the folder and file names are in the original path
+                        MediaTagParser.applyPathTags(metadata, filename)
                     }
 
                 if (isVideo) {

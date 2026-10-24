@@ -486,6 +486,7 @@ class CustomFeedProvider(
                                     AerialMediaMetadata(
                                         timeOfDay = TimeOfDay.UNKNOWN,
                                         scene = SceneType.UNKNOWN,
+                                        weather = asset.weatherTags(),
                                     ),
                                 audioUri = asset.audioUri(),
                             ),

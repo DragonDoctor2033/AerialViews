@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.preference.CheckBoxPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import androidx.preference.TwoStatePreference
 import com.neilturner.aerialviews.R
 import com.neilturner.aerialviews.models.enums.PlaylistAudioMode
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
@@ -36,13 +37,28 @@ class PlaylistFragment : MenuStateFragment() {
         setupSummaryUpdater("limit_longer_videos", R.array.limit_Longer_videos_summaries)
 
         val autoTimeOfDayPref = findPreference<CheckBoxPreference>("playlist_auto_time_of_day")
+        val weatherMatchPref = findPreference<TwoStatePreference>("playlist_weather_match")
         autoTimeOfDayPref?.onPreferenceChangeListener =
             Preference.OnPreferenceChangeListener { _, newValue ->
-                updateLocationEnabledState(newValue as Boolean)
+                updateLocationEnabledState(
+                    timeOfDay = newValue as Boolean,
+                    weather = weatherMatchPref?.isChecked ?: false,
+                )
+                true
+            }
+        weatherMatchPref?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { _, newValue ->
+                updateLocationEnabledState(
+                    timeOfDay = autoTimeOfDayPref?.isChecked ?: false,
+                    weather = newValue as Boolean,
+                )
                 true
             }
 
-        updateLocationEnabledState(autoTimeOfDayPref?.isChecked ?: false)
+        updateLocationEnabledState(
+            timeOfDay = autoTimeOfDayPref?.isChecked ?: false,
+            weather = weatherMatchPref?.isChecked ?: false,
+        )
 
         val audioModePref = findPreference<ListPreference>("playlist_audio_mode")
         audioModePref?.onPreferenceChangeListener =
@@ -63,11 +79,15 @@ class PlaylistFragment : MenuStateFragment() {
         setupLocationPreference()
     }
 
-    private fun updateLocationEnabledState(enabled: Boolean) {
+    private fun updateLocationEnabledState(
+        timeOfDay: Boolean,
+        weather: Boolean,
+    ) {
         val locationPreference = findPreference<Preference>("weather_location_name")
         val boundariesPreference = findPreference<Preference>("playlist_time_of_day_boundaries")
-        locationPreference?.isEnabled = enabled
-        boundariesPreference?.isEnabled = enabled
+        // Matching the weather needs the location too, the sunrise and sunset choice is only for time of day
+        locationPreference?.isEnabled = timeOfDay || weather
+        boundariesPreference?.isEnabled = timeOfDay
     }
 
     private fun setupLocationPreference() {

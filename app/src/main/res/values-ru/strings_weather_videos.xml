@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <string name="weather_videos_category">Подбор по погоде</string>
+  <string name="weather_videos_match_title">Подбирать видео по текущей погоде</string>
+  <string name="weather_videos_match_summary">Предпочитать видео, подходящие к погоде на улице. Укажите погоду в названиях папок или файлов: clear, cloudy, rain, snow, storm или fog (например, Weather/rain/night/forest.mp4 или beach_clear_day.mp4). Видео без указания погоды используются, если ничего не подошло. Используется местоположение, заданное в разделе «Время суток».</string>
+  <string name="weather_videos_override_title">Подмена погоды (для тестирования)</string>
+  <string name="weather_videos_override_off">Выкл.</string>
+  <string name="weather_videos_override_clear">Ясно</string>
+  <string name="weather_videos_override_cloudy">Облачно</string>
+  <string name="weather_videos_override_rain">Дождь</string>
+  <string name="weather_videos_override_snow">Снег</string>
+  <string name="weather_videos_override_storm">Гроза</string>
+  <string name="weather_videos_override_fog">Туман</string>
+</resources>

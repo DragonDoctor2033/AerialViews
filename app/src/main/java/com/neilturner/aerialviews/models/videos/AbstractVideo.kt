@@ -3,8 +3,11 @@ package com.neilturner.aerialviews.models.videos
 import android.net.Uri
 import androidx.core.net.toUri
 import com.neilturner.aerialviews.models.enums.VideoQuality
+import com.neilturner.aerialviews.models.enums.WeatherCondition
+import com.neilturner.aerialviews.utils.MediaTagParser
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 abstract class AbstractVideo {
@@ -35,7 +38,12 @@ abstract class AbstractVideo {
     val timeOfDay: String = ""
     val scene: String = ""
 
+    // Custom feeds only: a string or an array of strings, read leniently by weatherTags()
+    val weather: JsonElement? = null
+
     fun audioUri(): Uri? = audioUrl?.takeIf { it.isNotBlank() }?.toUri()
+
+    fun weatherTags(): Set<WeatherCondition> = MediaTagParser.weatherFromJson(weather)
 
     abstract fun uriAtQuality(quality: VideoQuality?): Uri
 

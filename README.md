@@ -25,6 +25,7 @@ Inspired by Apple TV's beautiful video screensaver!
 * Message overlay API - Send custom messages to display on your TV from any device on your network (eg. Home Assistant)
 * Alternate the position of overlays to avoid burn-in on QD/OLED TVs
 * Many playlist options to limit media length or loop certain videos
+* Play videos that [match the weather outside](#weather-matched-videos), based on folder and file names like `rain` or `snow`
 * Use the D-Pad or swipe (on phones, tablets, etc) to skip media, skip songs, change speed, seek, pause and more
 * Refresh rate switching for 24fps, 30fps, 50fps, 60fps content
 
@@ -686,6 +687,7 @@ The app supports the "community" video format, which is a JSON file (typically n
       "url-1080-SDR": "https://example.com/videos/sunset_1080p.mp4",
       "url-4K-SDR": "https://example.com/videos/sunset_4k.mp4",
       "url-audio": "https://example.com/videos/sunset_audio.m4a",
+      "weather": ["clear", "sunny"],
       "pointsOfInterest": {
         "0": "The setting sun",
         "30": "Palm trees swaying in the breeze"
@@ -696,6 +698,8 @@ The app supports the "community" video format, which is a JSON file (typically n
 ```
 
 The optional `url-audio` field is intended for DASH-style videos from some external providers, where the video and audio streams are encoded seperately. 
+
+The optional `weather` field, a string or an array of strings, tags a video for [weather-matched playback](#weather-matched-videos). It uses the same words as folder and file names, such as `rain` or `snow`. Words that are not understood are ignored.
 
 Another example [can be found on GitHub](https://github.com/AerialScreensaver/AerialCommunity/blob/master/entries.json).
 
@@ -731,6 +735,49 @@ You can also add direct links to video streams. Separate multiple URLs with a co
 Supported formats:
 * **HLS (.m3u8)**: Commonly used for live streams and IPTV.
 * **RTSP**: Used for security cameras and low-latency streaming.
+
+</details>
+
+## Weather-matched videos
+
+Aerial Views can prefer videos that suit the weather outside. Turn on `Settings > Playlist > Weather matching > Match videos to the current weather` and set your location under `Time of Day`. The same location is used for the weather overlays.
+
+When the screensaver starts, the current weather is looked up (one quick request, which is reused for an hour) and the videos are chosen like this...
+
+1. Videos tagged for the current weather are played, on their own.
+2. If there are none, the weather's fallback is tried: storm, then rain, then cloudy. Rain, snow and fog fall back to cloudy. Clear and cloudy have no fallback.
+3. If nothing is tagged for that either, only videos with no weather tag are played, so snow clips never show when it is clear.
+4. If there are none of those, all videos are played. The playlist is never empty.
+
+Photos are never filtered, and time-of-day filtering is applied first, so night clips are not played during the day. If the weather cannot be found (no location, no network), the playlist is not filtered.
+
+<details>
+<summary>Tagging your videos</summary>
+&nbsp;
+
+Videos from USB storage, Samba, WebDAV, Immich and Nextcloud Memories are tagged by the names of their folders and files. Each name is split into words at anything that is not a letter, and the words are compared without regard to case. Only whole words count, so `rainbow` is not `rain`.
+
+| Weather | Words                                     |
+|---------|-------------------------------------------|
+| Clear   | `clear`, `sunny`                          |
+| Cloudy  | `cloudy`, `clouds`, `overcast`            |
+| Rain    | `rain`, `rainy`, `drizzle`                |
+| Snow    | `snow`, `snowy`                           |
+| Storm   | `storm`, `thunder`, `thunderstorm`        |
+| Fog     | `fog`, `foggy`, `mist`                    |
+
+The words `day`, `night`, `sunrise` and `sunset` set the time of day of a video, so local videos also work with automated time-of-day filtering. The name closest to the file wins, and a name with two different times of day, like `day_to_night.mp4`, is left unknown.
+
+```text
+Weather/rain/night/forest.mp4    rain, night
+Weather/snow/day/x.mp4           snow, day
+beach_clear_day.mp4              clear, day
+storm_over_the_sea.mp4           storm
+```
+
+Every folder in the path counts, including the folder you chose for the source. Only the path is read, never the server name or the login. Videos from Apple, Amazon and the community are not tagged. For custom feeds, use the `weather` field of an entry.
+
+Use `Weather override (testing)` in the same settings category to pretend that it is raining (or any other weather) while you check your tags.
 
 </details>
 
