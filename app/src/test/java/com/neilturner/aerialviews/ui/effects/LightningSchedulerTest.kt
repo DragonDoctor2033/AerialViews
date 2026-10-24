@@ -142,20 +142,22 @@ internal class LightningSchedulerTest {
     fun `the sky is dark most of the time, a storm is not a strobe`() {
         val levels = storm(newScheduler(4), 10 * 60_000L).brightness
 
+        // A strike is lit for under a second, a double one for up to a second and a quarter, and they are 8 to 25 s apart
         val lit = levels.count { it > 0f }
         assertTrue(lit < levels.size / 10, "lit for $lit of ${levels.size} frames")
+        assertTrue(lit > levels.size / 50, "lit for $lit of ${levels.size} frames")
     }
 
-    // Each strike as the viewer sees it, cut from the frames: from its start to 700 ms later
+    // Each strike as the viewer sees it, cut from the frames: from its start to 1300 ms later, which is more than any strike takes
     private fun strikes(
         seed: Long,
         chance: Float,
         millis: Long = 20 * 60_000L,
     ): List<List<Float>> {
         val storm = storm(newScheduler(seed, chance), millis)
-        val frames = (700 / frame).toInt()
+        val frames = (1300 / frame).toInt()
         return storm.strikes
-            .filter { it + 700 <= millis }
+            .filter { it + 1300 <= millis }
             .map { start -> storm.brightness.subList((start / frame).toInt(), (start / frame).toInt() + frames) }
     }
 
@@ -170,15 +172,28 @@ internal class LightningSchedulerTest {
     }
 
     @Test
-    fun `a strike lights up at once, is brightest after 25 ms, and fades away`() {
+    fun `a strike builds up in 70 ms, is brightest then, and fades away in under 900 ms`() {
         strikes(1, chance = 0f).forEach { strike ->
             assertEquals(0f, strike[0])
             val peak = strike.max()
             assertTrue(peak in 0.75f..1f, "peak $peak")
-            assertEquals(peak, strike[(25 / frame).toInt()], 0.0001f)
+            assertEquals(peak, strike[(70 / frame).toInt()], 0.0001f)
+            // It is not a blink: it is still half of its peak a quarter of a second after it started
+            assertTrue(strike[(270 / frame).toInt()] > peak * 0.5f)
             assertFalse(isDouble(strike))
-            // And it is over in just over half a second
-            assertEquals(0f, strike[(550 / frame).toInt()])
+            // And it is over in under 900 ms
+            assertEquals(0f, strike[(880 / frame).toInt()])
+            assertTrue(strike[(800 / frame).toInt()] < 0.01f)
+        }
+    }
+
+    @Test
+    fun `a strike builds up smoothly, with no step from one frame to the next`() {
+        strikes(5, chance = 0f).forEach { strike ->
+            var biggest = 0f
+            for (i in 1 until strike.size) biggest = maxOf(biggest, kotlin.math.abs(strike[i] - strike[i - 1]))
+            // At 5 ms per frame, the steepest part of the build up is a tenth of the peak. A blink would jump by most of it
+            assertTrue(biggest < 0.12f, "biggest step $biggest")
         }
     }
 
@@ -212,17 +227,27 @@ internal class LightningSchedulerTest {
     }
 
     @Test
-    fun `the second flash of a double flash comes 130 to 260 ms after the first, and is weaker`() {
+    fun `the second flash of a double flash comes 400 to 560 ms after the first, is weaker, and is seen`() {
         strikes(8, chance = 1f).forEach { strike ->
             val firstPeak = strike.max()
             // The flash fades, then rises again for the second flash, and fades again
-            val dip = (6 until strike.size - 1).first { strike[it + 1] > strike[it] + 0.0001f }
+            val dip = (14 until strike.size - 1).first { strike[it + 1] > strike[it] + 0.0001f }
             val secondPeak = (dip + 1 until strike.size - 1).first { strike[it + 1] <= strike[it] }
 
-            // The second flash starts 130 to 260 ms in, and takes 20 ms to peak
-            assertTrue(secondPeak * frame in 150L..285L, "second peak at ${secondPeak * frame} ms")
+            // The second flash starts 400 to 560 ms in, and takes 40 ms to peak, a bit more as it comes up from the first
+            assertTrue(secondPeak * frame in 440L..600L, "second peak at ${secondPeak * frame} ms")
             assertTrue(strike[secondPeak] < firstPeak)
-            assertEquals(0.7f, strike[secondPeak] / firstPeak, 0.06f)
+            assertEquals(0.6f, strike[secondPeak] / firstPeak, 0.06f)
+            // It comes up from a dip, and not from where the first flash is: the sky gets a good deal brighter
+            assertTrue(strike[secondPeak] - strike[dip] > 0.2f * firstPeak, "rises from ${strike[dip]} to ${strike[secondPeak]}")
+        }
+    }
+
+    @Test
+    fun `a double flash is over in a second and a quarter`() {
+        strikes(9, chance = 1f).forEach { strike ->
+            assertEquals(0f, strike.last())
+            assertTrue(strike.indexOfLast { it > 0f } * frame < 1_220L)
         }
     }
 
@@ -254,9 +279,9 @@ internal class LightningSchedulerTest {
 
         val strikeFrame = (start / frame).toInt()
         // The strike is the same as in the storm which was left on
-        assertEquals(storm.brightness.subList(strikeFrame, strikeFrame + 100), levels.subList(strikeFrame, strikeFrame + 100))
+        assertEquals(storm.brightness.subList(strikeFrame, strikeFrame + 170), levels.subList(strikeFrame, strikeFrame + 170))
         // And nothing comes after it
-        assertTrue(levels.drop(strikeFrame + 110).all { it == 0f })
+        assertTrue(levels.drop(strikeFrame + 180).all { it == 0f })
         assertEquals(1, again.strikes)
     }
 
@@ -340,42 +365,69 @@ internal class LightningSchedulerTest {
     }
 
     @Test
-    fun `a flash rises in 25 ms to its full brightness and then fades`() {
-        assertEquals(0.5f, LightningFlash.flash(12.5f), 0.0001f)
-        assertEquals(1f, LightningFlash.flash(25f))
-        assertTrue(LightningFlash.flash(60f) < 1f)
-        assertTrue(LightningFlash.flash(60f) > LightningFlash.flash(120f))
-        assertTrue(LightningFlash.flash(120f) > LightningFlash.flash(300f))
+    fun `a flash builds up smoothly in 70 ms to its full brightness and then fades`() {
+        // A smooth start and a smooth end, so half way in is half of the brightness, and it is slow at both ends
+        assertEquals(0.5f, LightningFlash.flash(35f), 0.0001f)
+        assertEquals(1f, LightningFlash.flash(70f))
+        assertTrue(LightningFlash.flash(7f) < 0.03f, "a slow start: ${LightningFlash.flash(7f)}")
+        assertTrue(LightningFlash.flash(63f) > 0.97f, "a slow end: ${LightningFlash.flash(63f)}")
+        assertTrue(LightningFlash.flash(100f) < 1f)
+        assertTrue(LightningFlash.flash(100f) > LightningFlash.flash(300f))
+        assertTrue(LightningFlash.flash(300f) > LightningFlash.flash(600f))
+    }
+
+    @Test
+    fun `a flash fades in 800 ms with an ease-out, quickly at first and then slower`() {
+        // A quarter of the fade left is a sixteenth of the brightness, half of it is a quarter
+        assertEquals(1f, LightningFlash.flash(70f), 0.0001f)
+        assertEquals(0.5625f, LightningFlash.flash(70f + 200f), 0.0001f)
+        assertEquals(0.25f, LightningFlash.flash(70f + 400f), 0.0001f)
+        assertEquals(0.0625f, LightningFlash.flash(70f + 600f), 0.0001f)
+        assertEquals(0f, LightningFlash.flash(70f + 800f))
+
+        val drops = (0 until 4).map { LightningFlash.flash(70f + 200f * it) - LightningFlash.flash(70f + 200f * (it + 1)) }
+        for (i in 0 until drops.lastIndex) assertTrue(drops[i] > drops[i + 1], "drops $drops")
+    }
+
+    @Test
+    fun `a flash is as long as 70 ms and 800 ms say, and a custom one as it is told`() {
+        assertEquals(1f, LightningFlash.flash(100f, attackMillis = 100f, decayMillis = 200f))
+        assertEquals(0.25f, LightningFlash.flash(200f, attackMillis = 100f, decayMillis = 200f), 0.0001f)
+        assertEquals(0f, LightningFlash.flash(300f, attackMillis = 100f, decayMillis = 200f))
+        assertEquals(880L, LightningFlash.SINGLE_MILLIS)
+        assertTrue(LightningFlash.SINGLE_MILLIS in 770L..970L, "attack and decay with a margin")
     }
 
     @Test
     fun `a flash fades to nothing smoothly, without a jump at the end`() {
         var previous = 1f
         var biggestJump = 0f
-        for (ms in 25..(LightningFlash.SINGLE_MILLIS + 20).toInt()) {
+        for (ms in 70..(LightningFlash.SINGLE_MILLIS + 20).toInt()) {
             val level = LightningFlash.flash(ms.toFloat())
             assertTrue(level <= previous)
             biggestJump = maxOf(biggestJump, previous - level)
             previous = level
         }
-        // Not even the last step to nothing is more than a hundredth
-        assertTrue(biggestJump < 0.02f, "biggest jump $biggestJump")
+        // Not even the last step to nothing is more than half a hundredth, as the fade ends flat
+        assertTrue(biggestJump < 0.005f, "biggest jump $biggestJump")
         assertEquals(0f, previous)
+        assertTrue(LightningFlash.flash(860f) < 0.001f)
     }
 
     @Test
     fun `a double flash is the first flash and then a second one, weaker, after the delay`() {
-        // The first flash has faded to 0.1 by 280 ms, and the second flash peaks at 0.7
-        assertEquals(LightningFlash.flash(100f), LightningFlash.level(100L, doubleFlash = true, secondDelayMillis = 260L))
-        assertEquals(0.7f, LightningFlash.level(280L, doubleFlash = true, secondDelayMillis = 260L), 0.0001f)
-        assertEquals(LightningFlash.flash(280f), LightningFlash.level(280L, doubleFlash = false, secondDelayMillis = 260L))
-        assertEquals(0.7f, LightningFlash.SECOND_FLASH_PEAK)
+        // The first flash has faded to 0.29 by 440 ms, and the second flash peaks at 0.6, 40 ms after it starts
+        assertEquals(LightningFlash.flash(100f), LightningFlash.level(100L, doubleFlash = true, secondDelayMillis = 400L))
+        assertEquals(0.6f, LightningFlash.level(440L, doubleFlash = true, secondDelayMillis = 400L), 0.0001f)
+        assertEquals(LightningFlash.flash(440f), LightningFlash.level(440L, doubleFlash = false, secondDelayMillis = 400L))
+        assertEquals(0.6f, LightningFlash.SECOND_FLASH_PEAK)
+        assertTrue(LightningFlash.SECOND_FLASH_PEAK < 0.7f, "it was 0.7")
     }
 
     @Test
     fun `a double flash is never darker than a single one`() {
-        for (delay in listOf(130L, 200L, 260L)) {
-            for (ms in 0L..800L step 5L) {
+        for (delay in listOf(400L, 480L, 560L)) {
+            for (ms in 0L..1400L step 5L) {
                 val single = LightningFlash.level(ms, doubleFlash = false, secondDelayMillis = delay)
                 val double = LightningFlash.level(ms, doubleFlash = true, secondDelayMillis = delay)
 
@@ -386,11 +438,22 @@ internal class LightningSchedulerTest {
     }
 
     @Test
-    fun `a strike takes just over half a second, a double one the delay and a bit more`() {
-        assertEquals(540L, LightningFlash.durationMillis(doubleFlash = false, secondDelayMillis = 200L))
-        assertEquals(640L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 200L))
-        assertEquals(700L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 260L))
-        assertEquals(570L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 130L))
-        assertEquals(0f, LightningFlash.level(LightningFlash.durationMillis(true, 260L), true, 260L))
+    fun `the first flash has faded to a third or less when the second one comes, so that it is a second flash`() {
+        for (delay in 400L..560L step 10L) {
+            val atTheSecond = LightningFlash.flash(delay.toFloat())
+
+            assertTrue(atTheSecond < 0.35f, "delay $delay: ${LightningFlash.flash(delay.toFloat())}")
+            assertTrue(LightningFlash.SECOND_FLASH_PEAK > atTheSecond * 1.7f, "delay $delay")
+        }
+    }
+
+    @Test
+    fun `a strike takes under 900 ms, a double one the delay and a bit more`() {
+        assertEquals(880L, LightningFlash.durationMillis(doubleFlash = false, secondDelayMillis = 200L))
+        assertEquals(880L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 200L))
+        assertEquals(1_050L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 400L))
+        assertEquals(1_210L, LightningFlash.durationMillis(doubleFlash = true, secondDelayMillis = 560L))
+        assertEquals(0f, LightningFlash.level(LightningFlash.durationMillis(true, 560L), true, 560L))
+        assertEquals(0f, LightningFlash.level(LightningFlash.durationMillis(false, 0L), false, 0L))
     }
 }

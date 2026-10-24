@@ -20,11 +20,14 @@ object EffectPalette {
     /** The veil is this much as dense at the top of the screen as it is at the bottom, like fog which lies on the ground */
     const val VEIL_TOP_SHARE = 0.70f
 
-    /** A flash of lightning is this opaque at the most */
-    const val FLASH_MAX_ALPHA = 0.70f
+    /** A flash of lightning is this opaque at the most, at the top of the screen */
+    const val FLASH_MAX_ALPHA = 0.38f
+
+    /** At the bottom of the screen a flash is this much of what it is at the top, as it is light from the sky */
+    const val FLASH_BOTTOM_SHARE = 0.40f
 
     /** How much brighter the rain is for the moment of a flash, at the brightest */
-    const val FLASH_RAIN_BOOST = 0.8f
+    const val FLASH_RAIN_BOOST = 0.5f
 
     /**
      * The opacity of the layers of fog, far to near, at an intensity of 1, where the noise is at its
@@ -48,6 +51,10 @@ object EffectPalette {
     // Lighter snow is fainter: a base and a share of the intensity
     private const val SNOW_ALPHA_BASE = 0.85f
     private const val SNOW_ALPHA_SHARE = 0.15f
+
+    // A flash is as bright as this much of the most, with the lightest rain, and the most with the heaviest
+    private const val FLASH_BASE = 0.6f
+    private const val FLASH_SHARE = 0.4f
 
     // Colours by day and by night: red, green and blue
     private val TINT_DAY = intArrayOf(78, 90, 108)
@@ -140,6 +147,22 @@ object EffectPalette {
         opacity: Float,
         night: Float,
     ): Float = layerAlpha * opacity * (SNOW_ALPHA_BASE + SNOW_ALPHA_SHARE * level) * snowDim(night)
+
+    /**
+     * How opaque a flash of lightning is at the top of the screen. A storm with heavier rain has brighter flashes.
+     *
+     * @param flash how bright the sky is at this moment because of lightning, from 0 to 1
+     * @param gateOpacity how much of the effects is shown at all, from 0 to 1
+     * @param rainLevel the intensity of the rain of the storm, from 0 to 1
+     */
+    fun flashAlpha(
+        flash: Float,
+        gateOpacity: Float,
+        rainLevel: Float,
+    ): Float = FLASH_MAX_ALPHA * flash * gateOpacity * (FLASH_BASE + FLASH_SHARE * rainLevel)
+
+    /** How much of the flash there is at a [height] of the screen, from 0 (top) to 1 (bottom): the light comes from the sky */
+    fun flashHeightShare(height: Float): Float = EffectMath.lerp(1f, FLASH_BOTTOM_SHARE, EffectMath.clamp01(height))
 
     private fun colour(
         day: IntArray,

@@ -1,35 +1,36 @@
 package com.neilturner.aerialviews.ui.effects
 
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.random.Random
 
 /**
- * The shape of one flash of lightning: it lights up almost at once, and fades away. A double flash
- * is a second, weaker one a moment after the first.
+ * The shape of one flash of lightning: it builds up smoothly in a few frames, which is not a blink,
+ * and then fades away slowly, quickly at first and then slower and slower (an ease-out), to nothing.
+ * A double flash is a second, weaker one a good while after the first, when that has faded some.
  */
 object LightningFlash {
-    // A flash lights up in this time, and then fades with this time constant, to a hundredth in about half a second
-    private const val ATTACK_MILLIS = 25f
-    private const val DECAY_MILLIS = 110f
+    // A flash builds up in this time, with a smooth start and end, and then fades away in this time. The
+    // fade is a curve which starts steep and ends flat, so the flash is over without a step
+    private const val ATTACK_MILLIS = 70f
+    private const val DECAY_MILLIS = 800f
 
     // The second flash of a double flash is weaker, and a little quicker
-    const val SECOND_FLASH_PEAK = 0.7f
-    private const val SECOND_ATTACK_MILLIS = 20f
-    private const val SECOND_DECAY_MILLIS = 90f
+    const val SECOND_FLASH_PEAK = 0.6f
+    private const val SECOND_ATTACK_MILLIS = 40f
+    private const val SECOND_DECAY_MILLIS = 600f
 
-    // Below this a flash is over. It is invisible at that point, so nothing jumps when it is cut off
-    private const val GONE = 0.01f
-
-    /** How long a single flash takes to be over, with a margin: it is under a hundredth after about 530 ms */
-    const val SINGLE_MILLIS = 540L
+    /** How long a single flash takes to be over: its build up and its fade, with a margin */
+    const val SINGLE_MILLIS = 880L
 
     /** The time after the start of a second flash it takes to be over, with a margin */
-    private const val SECOND_MILLIS = 440L
+    private const val SECOND_MILLIS = 650L
 
     /**
      * How bright a flash is [sinceMillis] after it started, from 0 to 1. It is 0 before it starts
      * and after it is over.
+     *
+     * @param attackMillis how long it takes to build up to its full brightness
+     * @param decayMillis how long it takes to fade from there to nothing
      */
     fun flash(
         sinceMillis: Float,
@@ -37,9 +38,9 @@ object LightningFlash {
         decayMillis: Float = DECAY_MILLIS,
     ): Float {
         if (!(sinceMillis > 0f)) return 0f
-        if (sinceMillis < attackMillis) return sinceMillis / attackMillis
-        val level = exp(-(sinceMillis - attackMillis) / decayMillis)
-        return if (level < GONE) 0f else level
+        if (sinceMillis < attackMillis) return EffectMath.smoothstep(sinceMillis / attackMillis)
+        val left = 1f - (sinceMillis - attackMillis) / decayMillis
+        return if (left > 0f) left * left else 0f
     }
 
     /**
@@ -161,9 +162,10 @@ class LightningScheduler(
         const val MIN_GAP_MILLIS = 4_000L
         const val DOUBLE_FLASH_CHANCE = 0.35f
 
-        // The second flash of a double flash comes this long after the first, in milliseconds
-        private const val SECOND_FLASH_DELAY_MIN_MILLIS = 130L
-        private const val SECOND_FLASH_DELAY_RANGE_MILLIS = 130f
+        // The second flash of a double flash comes this long after the first, in milliseconds. By then
+        // the first has faded to a third or less of its brightness, so that the second one is seen
+        private const val SECOND_FLASH_DELAY_MIN_MILLIS = 400L
+        private const val SECOND_FLASH_DELAY_RANGE_MILLIS = 160f
 
         // Strikes are between this and the full brightness
         private const val PEAK_MIN = 0.75f

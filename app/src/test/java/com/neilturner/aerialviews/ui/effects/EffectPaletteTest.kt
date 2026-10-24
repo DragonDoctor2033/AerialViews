@@ -84,6 +84,63 @@ internal class EffectPaletteTest {
         assertEquals(0, alpha(EffectPalette.flash(0f)))
     }
 
+    // Lightning
+
+    @Test
+    fun `a flash is soft, 0 35 to 0 4 at the most, and fades to 40 percent towards the bottom of the screen`() {
+        assertEquals(0.38f, EffectPalette.FLASH_MAX_ALPHA)
+        assertTrue(EffectPalette.FLASH_MAX_ALPHA in 0.35f..0.40f)
+        assertEquals(0.40f, EffectPalette.FLASH_BOTTOM_SHARE)
+        assertEquals(1f, EffectPalette.flashHeightShare(0f), 0.0001f)
+        assertEquals(0.4f, EffectPalette.flashHeightShare(1f), 0.0001f)
+        assertEquals(0.7f, EffectPalette.flashHeightShare(0.5f), 0.0001f)
+        // The ends of the gradient of the view: the colour of the flash, all of it and 40 percent of it
+        assertEquals(255, alpha(EffectPalette.flash(1f)))
+        assertEquals(102, alpha(EffectPalette.flash(EffectPalette.FLASH_BOTTOM_SHARE)))
+        assertEquals(red(EffectPalette.flash(1f)), red(EffectPalette.flash(EffectPalette.FLASH_BOTTOM_SHARE)))
+    }
+
+    @Test
+    fun `the brightness of a flash only goes down from the top of the screen to the bottom`() {
+        var previous = 2f
+        for (step in 0..20) {
+            val share = EffectPalette.flashHeightShare(step / 20f)
+            assertTrue(share <= previous, "at $step")
+            previous = share
+        }
+        assertEquals(1f, EffectPalette.flashHeightShare(-3f), 0.0001f)
+        assertEquals(0.4f, EffectPalette.flashHeightShare(3f), 0.0001f)
+    }
+
+    @Test
+    fun `the opacity of a flash is the brightness of the sky, the gate and the rain of the storm`() {
+        // At the top, with the heaviest rain, the brightest flash is the most there is
+        assertEquals(0.38f, EffectPalette.flashAlpha(1f, 1f, 1f), 0.0001f)
+        // With no rain it is 60 percent of that, and it follows the brightness and the gate linearly
+        assertEquals(0.38f * 0.6f, EffectPalette.flashAlpha(1f, 1f, 0f), 0.0001f)
+        assertEquals(0.38f * 0.5f * 0.92f, EffectPalette.flashAlpha(0.5f, 1f, 0.8f), 0.0001f)
+        assertEquals(0f, EffectPalette.flashAlpha(0f, 1f, 1f))
+        assertEquals(0f, EffectPalette.flashAlpha(1f, 0f, 1f))
+    }
+
+    @Test
+    fun `a flash of a strike in a typical storm is much softer than it was, 0 35 at the top and 0 14 at the bottom at the most`() {
+        // The weather of a storm is 0.8, and the brightest strike is 1. It was 0.64 over all of the screen
+        val top = EffectPalette.flashAlpha(1f, 1f, 0.8f)
+        val bottom = top * EffectPalette.flashHeightShare(1f)
+
+        assertTrue(top in 0.3f..0.36f, "top $top")
+        assertTrue(bottom in 0.12f..0.15f, "bottom $bottom")
+        // Over all of the screen it is under half of the flat 0.64 it was
+        assertTrue((top + bottom) / 2f < 0.64f / 2f, "on average ${(top + bottom) / 2f}")
+    }
+
+    @Test
+    fun `the rain is lit up less by a flash, as the flash is softer`() {
+        assertEquals(0.5f, EffectPalette.FLASH_RAIN_BOOST)
+        assertTrue(EffectPalette.FLASH_RAIN_BOOST < 0.8f, "it was 0.8")
+    }
+
     @Test
     fun `things are dimmer by night`() {
         listOf(
@@ -163,7 +220,7 @@ internal class EffectPaletteTest {
     fun `no layer is more opaque than the most it is meant to be`() {
         assertTrue(EffectPalette.TINT_MAX_ALPHA in 0.1f..0.4f)
         assertTrue(EffectPalette.VEIL_MAX_ALPHA in 0.3f..0.5f)
-        assertTrue(EffectPalette.FLASH_MAX_ALPHA in 0.5f..0.9f)
+        assertTrue(EffectPalette.FLASH_MAX_ALPHA in 0.3f..0.45f)
         assertTrue(EffectPalette.FOG_LAYER_ALPHA.all { it in 0.4f..0.8f })
 
         // Fog stacks up, so where all three layers are at their thickest it is dense but not solid

@@ -54,8 +54,9 @@ interface EffectsSurface {
  *   stretched with a filter, drifting slowly in different directions, and a veil which lowers the
  *   contrast, light grey by day and darker by night, and a little denser towards the bottom of the
  *   screen like fog on the ground. See [FogNoise] and [FogLayers].
- * - A storm is rain and flashes of lightning, see [LightningScheduler]. Overcast is a grey-blue tone
- *   which dims the footage. Rain, snow and fog come with some of it.
+ * - A storm is rain and flashes of lightning, see [LightningScheduler]. A flash is a soft light from
+ *   the sky, which builds up and fades slowly and is brighter at the top of the screen than at the
+ *   bottom. Overcast is a grey-blue tone which dims the footage. Rain, snow and fog come with some of it.
  * - By night everything is dimmer.
  *
  * What there is on the screen moves to what the weather wants over about two seconds, so a change of
@@ -123,6 +124,10 @@ class WeatherEffectsView
         // The veil is a gradient of white, denser towards the bottom, which is given its colour by a
         // colour filter (light grey by day, darker by night) and its opacity by the alpha of the paint
         private val veilPaint = Paint().apply { colorFilter = LightingColorFilter(EffectPalette.veil(0f, 1f), 0) }
+
+        // A flash is a gradient of the colour of the flash, from all of it at the top to a share of it
+        // at the bottom, and the alpha of the paint is how bright the flash is at the moment
+        private val flashPaint = Paint()
         private val spriteRect = RectF()
 
         // On every frame, while something moves. The callback is posted again by every frame, so it
@@ -184,6 +189,7 @@ class WeatherEffectsView
             fogBitmaps = null
             fogPaints.forEach { it.shader = null }
             veilPaint.shader = null
+            flashPaint.shader = null
         }
 
         // View
@@ -230,6 +236,7 @@ class WeatherEffectsView
             snowSprites = null
             // And the gradients go from the top of the screen to its bottom
             veilPaint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), VEIL_TOP, VEIL_BOTTOM, Shader.TileMode.CLAMP)
+            flashPaint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), FLASH_TOP, FLASH_BOTTOM, Shader.TileMode.CLAMP)
         }
 
         // This runs on every frame, so nothing in here, or in what it calls, may allocate anything:
@@ -351,10 +358,11 @@ class WeatherEffectsView
             canvas: Canvas,
             gateOpacity: Float,
         ) {
-            if (flash <= 0f) return
-            // A storm with heavier rain has brighter flashes
-            val alpha = EffectPalette.FLASH_MAX_ALPHA * flash * gateOpacity * (FLASH_BASE + FLASH_SHARE * mix.rain.level)
-            if (EffectMath.toByte(alpha) > 0) canvas.drawColor(EffectPalette.flash(alpha))
+            if (flash <= 0f || flashPaint.shader == null) return
+            // A storm with heavier rain has brighter flashes. The light comes from the sky, so it is
+            // brighter at the top of the screen, which the gradient of the paint does
+            flashPaint.alpha = EffectMath.toByte(EffectPalette.flashAlpha(flash, gateOpacity, mix.rain.level))
+            if (flashPaint.alpha > 0) canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), flashPaint)
         }
 
         // Frames
@@ -621,9 +629,9 @@ class WeatherEffectsView
             const val RAIN_ALPHA_BASE = 0.55f
             const val RAIN_ALPHA_SHARE = 0.45f
 
-            // A flash is as bright as this much of the most, with the lightest rain, and the most with the heaviest
-            const val FLASH_BASE = 0.6f
-            const val FLASH_SHARE = 0.4f
+            // The gradient of a flash: all of its colour at the top and a share of it at the bottom
+            val FLASH_TOP = EffectPalette.flash(1f)
+            val FLASH_BOTTOM = EffectPalette.flash(EffectPalette.FLASH_BOTTOM_SHARE)
 
             // The night fades the fog's light in this many steps
             const val FOG_LIGHT_STEPS = 32f
