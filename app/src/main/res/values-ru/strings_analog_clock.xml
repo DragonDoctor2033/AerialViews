@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <resources>
+  <string name="analog_clock_center_size_extra_large">Очень большой (55% высоты экрана)</string>
+  <string name="analog_clock_center_size_large">Большой (45% высоты экрана)*</string>
+  <string name="analog_clock_center_size_medium">Средний (35% высоты экрана)</string>
+  <string name="analog_clock_center_size_title">Размер часов в центре</string>
   <string name="analog_clock_halo_light">Слабый</string>
   <string name="analog_clock_halo_medium">Средний*</string>
   <string name="analog_clock_halo_off">Выкл.</string>
   <string name="analog_clock_halo_strong">Сильный</string>
   <string name="analog_clock_halo_title">Ореол за часами</string>
+  <string name="analog_clock_show_in_center_summary">Одни большие часы посередине экрана, независимо от аналоговых часов в углах. Раз в минуту они смещаются на несколько пикселей, чтобы экран не выгорал</string>
+  <string name="analog_clock_show_in_center_title">Показывать в центре экрана</string>
   <string name="analog_clock_show_second_hand_summary">Тонкая красная стрелка, которая двигается раз в секунду</string>
   <string name="analog_clock_show_second_hand_title">Показывать секундную стрелку</string>
   <string name="analog_clock_size_large">Большой</string>
@@ -14,5 +20,6 @@
   <string name="appearance_analog_clock_summary">Отображение текущего времени на циферблате со стрелками</string>
   <string name="appearance_analog_clock_title">Аналоговые часы</string>
   <string name="category_analog_clock">Аналоговые часы</string>
+  <string name="category_analog_clock_center">Центр экрана</string>
   <string name="slot_analog_clock">Аналоговые часы</string>
 </resources>

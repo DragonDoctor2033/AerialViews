@@ -14,6 +14,7 @@ import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockGeometry
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockHaloMath
 import com.neilturner.aerialviews.ui.overlays.utils.AnalogClockMath
+import com.neilturner.aerialviews.ui.overlays.utils.BurnInDrift
 import com.neilturner.aerialviews.ui.overlays.utils.ClockHandAngles
 import java.time.LocalTime
 import kotlin.math.min
@@ -30,7 +31,12 @@ import kotlin.math.min
  * Like the other overlays it is a plain view that [OverlayHelper][com.neilturner.aerialviews.ui.helpers.OverlayHelper]
  * places in a corner slot, so the screen controller's fade, auto-hide and alternate position
  * handling (alpha and Flow constraints) work on it without any special cases. Opacity comes from
- * the view's alpha, the overlay colour from [configure].
+ * the view's alpha, the overlay colour from [configure]. The same view is also used for the one big
+ * clock in the center of the screen, which fades together with the others in the same way.
+ *
+ * A clock which never moves can burn into the screen, so the one in the center can be set to
+ * drift: it is shifted a few dp every minute, see [BurnInDrift]. That is the translation of the
+ * view, which nothing else touches, so it doesn't get in the way of the fades, which animate alpha.
  *
  * The clock only keeps time while it is attached to a window and actually shown: it redraws once
  * a second, on the second boundary, and stops as soon as it is detached or hidden (for example
@@ -58,6 +64,11 @@ class AnalogClockOverlay
         private var showSecondHand = true
         private var colour = Color.WHITE
 
+        private var burnInDrift = false
+
+        // The minute the view was last moved for, so it is moved once a minute and not every tick
+        private var driftMinute = NO_MINUTE
+
         private var centreX = 0f
         private var centreY = 0f
         private var faceRadius = 0f
@@ -74,6 +85,7 @@ class AnalogClockOverlay
                 override fun run() {
                     if (!ticking) return
                     val millis = refreshAngles()
+                    updateDrift()
                     // Nothing to see while faded out by auto-hide, the fade in redraws it
                     if (alpha > 0f) invalidate()
                     postDelayed(this, AnalogClockMath.millisUntilNextSecond(millis))
@@ -91,12 +103,14 @@ class AnalogClockOverlay
          * @param colour overlay colour for the ticks, hour and minute hands and the centre dot.
          * The second hand always stays red
          * @param halo how dark the soft halo behind the face is, or off
+         * @param burnInDrift move the clock a few dp every minute, for a clock which stays put
          */
         fun configure(
             faceDiameterPx: Int,
             showSecondHand: Boolean,
             colour: Int,
             halo: AnalogClockHalo,
+            burnInDrift: Boolean = false,
         ) {
             val newDiameter = faceDiameterPx.coerceAtLeast(0)
             if (newDiameter != this.faceDiameterPx || halo != this.halo) {
@@ -107,6 +121,13 @@ class AnalogClockOverlay
             }
             this.showSecondHand = showSecondHand
             this.colour = colour
+            this.burnInDrift = burnInDrift
+            if (!burnInDrift) {
+                // Back to where the layout put it, and the next drift starts from scratch
+                driftMinute = NO_MINUTE
+                translationX = 0f
+                translationY = 0f
+            }
             updateHaloShader()
             invalidate()
         }
@@ -261,6 +282,20 @@ class AnalogClockOverlay
             return millis
         }
 
+        // Moves the view to the spot for the current minute. The tick calls this every second,
+        // but it only does anything once a minute, and while the clock is hidden there are no ticks
+        private fun updateDrift() {
+            if (!burnInDrift) return
+
+            val minute = System.currentTimeMillis() / MILLIS_PER_MINUTE
+            if (minute == driftMinute) return
+            driftMinute = minute
+
+            val offset = BurnInDrift.offsetPx(minute, density)
+            translationX = offset.x
+            translationY = offset.y
+        }
+
         private fun updateTicking() {
             if (isAttachedToWindow && isShown && windowVisibility == VISIBLE) {
                 startTicking()
@@ -284,6 +319,8 @@ class AnalogClockOverlay
         private companion object {
             const val SHADOW_OFFSET_DP = 1f
             const val NANOS_PER_MILLI = 1_000_000
+            const val MILLIS_PER_MINUTE = 60_000L
+            const val NO_MINUTE = Long.MIN_VALUE
             const val SECOND_HAND_COLOUR = 0xFFFF3B30.toInt()
             val SHADOW_COLOUR = Color.argb(120, 0, 0, 0)
         }

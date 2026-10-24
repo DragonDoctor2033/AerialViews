@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.settings
 
+import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.prefs.AnalogClockPrefs
@@ -26,12 +27,20 @@ internal class AnalogClockSettingsTest {
         val keys = ResourceXml.elementsWithAttribute(screen, "app:key").map { it.getAttribute("app:key") }
 
         assertEquals(
-            listOf(AnalogClockPrefs.KEY_SIZE, AnalogClockPrefs.KEY_SHOW_SECOND_HAND, AnalogClockPrefs.KEY_HALO),
+            listOf(
+                AnalogClockPrefs.KEY_SIZE,
+                AnalogClockPrefs.KEY_SHOW_SECOND_HAND,
+                AnalogClockPrefs.KEY_HALO,
+                AnalogClockPrefs.KEY_SHOW_IN_CENTER,
+                AnalogClockPrefs.KEY_CENTER_SIZE,
+            ),
             keys,
         )
         assertEquals("analog_clock_size", AnalogClockPrefs.KEY_SIZE)
         assertEquals("analog_clock_show_second_hand", AnalogClockPrefs.KEY_SHOW_SECOND_HAND)
         assertEquals("analog_clock_halo", AnalogClockPrefs.KEY_HALO)
+        assertEquals("analog_clock_show_in_center", AnalogClockPrefs.KEY_SHOW_IN_CENTER)
+        assertEquals("analog_clock_center_size", AnalogClockPrefs.KEY_CENTER_SIZE)
     }
 
     @Test
@@ -93,6 +102,74 @@ internal class AnalogClockSettingsTest {
     }
 
     @Test
+    fun `the clock in the center is a checkbox which is off by default`() {
+        val center = ResourceXml.preference(screen, AnalogClockPrefs.KEY_SHOW_IN_CENTER)
+
+        assertEquals("CheckBoxPreference", center.tagName)
+        assertEquals("false", center.getAttribute("app:defaultValue"))
+        assertEquals("@string/analog_clock_show_in_center_title", center.getAttribute("app:title"))
+        assertEquals("@string/analog_clock_show_in_center_summary", center.getAttribute("app:summary"))
+        assertEquals("Show in the center of the screen", ResourceXml.strings(strings).getValue("analog_clock_show_in_center_title"))
+    }
+
+    @Test
+    fun `the size in the center is a dropdown of the three sizes, large by default`() {
+        val size = ResourceXml.preference(screen, AnalogClockPrefs.KEY_CENTER_SIZE)
+        assertEquals("ListPreference", size.tagName)
+        assertEquals("@array/analog_clock_center_size_entries", size.getAttribute("app:entries"))
+        assertEquals("@array/analog_clock_center_size_values", size.getAttribute("app:entryValues"))
+        assertEquals("@string/analog_clock_center_size_title", size.getAttribute("app:title"))
+
+        val values = ResourceXml.stringArray(strings, "analog_clock_center_size_values")
+        val entries = ResourceXml.stringArray(strings, "analog_clock_center_size_entries")
+        assertEquals(listOf("MEDIUM", "LARGE", "EXTRA_LARGE"), values)
+        assertEquals(AnalogClockCenterSize.entries.map { it.name }, values)
+        assertEquals(values.size, entries.size)
+
+        val default = ResourceXml.strings(strings).getValue("analog_clock_center_size_default")
+        assertEquals("@string/analog_clock_center_size_default", size.getAttribute("app:defaultValue"))
+        assertEquals("LARGE", default)
+        assertEquals(AnalogClockCenterSize.DEFAULT.name, default)
+    }
+
+    @Test
+    fun `the size in the center only matters, and is only enabled, when the clock is shown there`() {
+        val size = ResourceXml.preference(screen, AnalogClockPrefs.KEY_CENTER_SIZE)
+
+        assertEquals(AnalogClockPrefs.KEY_SHOW_IN_CENTER, size.getAttribute("app:dependency"))
+    }
+
+    @Test
+    fun `each size in the center says its share of the screen height`() {
+        val values = ResourceXml.stringArray(strings, "analog_clock_center_size_values")
+        val entries = ResourceXml.stringArray(strings, "analog_clock_center_size_entries").map { it.removePrefix("@string/") }
+        val texts = ResourceXml.strings(strings)
+        val russian = ResourceXml.strings(russianStrings)
+
+        values.forEachIndexed { index, value ->
+            val percent = AnalogClockCenterSize.valueOf(value).percentOfScreenHeight
+            assertTrue("$percent%" in texts.getValue(entries[index]), "'${entries[index]}' should say $percent%")
+            assertTrue("$percent%" in russian.getValue(entries[index]), "'${entries[index]}' in Russian should say $percent%")
+        }
+    }
+
+    @Test
+    fun `the clock in the center has a category of its own, after the clock settings`() {
+        val categories = ResourceXml.elementsWithAttribute(screen, "app:title").filter { it.tagName == "PreferenceCategory" }
+
+        assertEquals(
+            listOf("@string/category_analog_clock", "@string/category_analog_clock_center"),
+            categories.map { it.getAttribute("app:title") },
+        )
+        val inCenterCategory =
+            ResourceXml.children(categories.last(), "CheckBoxPreference") + ResourceXml.children(categories.last(), "ListPreference")
+        assertEquals(
+            setOf(AnalogClockPrefs.KEY_SHOW_IN_CENTER, AnalogClockPrefs.KEY_CENTER_SIZE),
+            inCenterCategory.map { it.getAttribute("app:key") }.toSet(),
+        )
+    }
+
+    @Test
     fun `analog clock is listed under overlays and opens its own screen`() {
         val entry =
             ResourceXml
@@ -134,7 +211,7 @@ internal class AnalogClockSettingsTest {
         val defined = ResourceXml.defaultStringNames()
         val used = stringReferences(screen) + stringReferences(overlaysScreen).filter { "analog" in it }
         val listed =
-            listOf("analog_clock_size_entries", "analog_clock_halo_entries")
+            listOf("analog_clock_size_entries", "analog_clock_halo_entries", "analog_clock_center_size_entries")
                 .flatMap { ResourceXml.stringArray(strings, it) }
                 .map { it.removePrefix("@string/") }
 

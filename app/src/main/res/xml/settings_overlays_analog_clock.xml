@@ -25,4 +25,21 @@
                     app:title="@string/analog_clock_halo_title"
                     app:useSimpleSummaryProvider="true" />
         </PreferenceCategory>
+
+        <PreferenceCategory app:title="@string/category_analog_clock_center">
+                <CheckBoxPreference
+                    app:defaultValue="false"
+                    app:key="analog_clock_show_in_center"
+                    app:summary="@string/analog_clock_show_in_center_summary"
+                    app:title="@string/analog_clock_show_in_center_title" />
+
+                <ListPreference
+                    app:defaultValue="@string/analog_clock_center_size_default"
+                    app:dependency="analog_clock_show_in_center"
+                    app:entries="@array/analog_clock_center_size_entries"
+                    app:entryValues="@array/analog_clock_center_size_values"
+                    app:key="analog_clock_center_size"
+                    app:title="@string/analog_clock_center_size_title"
+                    app:useSimpleSummaryProvider="true" />
+        </PreferenceCategory>
 </PreferenceScreen>

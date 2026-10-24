@@ -1,6 +1,7 @@
 package com.neilturner.aerialviews.models.prefs
 
 import com.chibatching.kotpref.KotprefModel
+import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 
@@ -13,6 +14,8 @@ object AnalogClockPrefs : KotprefModel() {
     const val KEY_SIZE = "analog_clock_size"
     const val KEY_SHOW_SECOND_HAND = "analog_clock_show_second_hand"
     const val KEY_HALO = "analog_clock_halo"
+    const val KEY_SHOW_IN_CENTER = "analog_clock_show_in_center"
+    const val KEY_CENTER_SIZE = "analog_clock_center_size"
 
     override val kotprefName = "${context.packageName}_preferences"
 
@@ -22,4 +25,10 @@ object AnalogClockPrefs : KotprefModel() {
 
     // Stored as the AnalogClockHalo constant name, read it with AnalogClockHalo.fromValue()
     var halo by stringPref(AnalogClockHalo.DEFAULT.name, KEY_HALO)
+
+    // One big clock in the middle of the screen, apart from any analog clock in a slot
+    var showInCenter by booleanPref(false, KEY_SHOW_IN_CENTER)
+
+    // Stored as the AnalogClockCenterSize constant name, read it with AnalogClockCenterSize.fromValue()
+    var centerSize by stringPref(AnalogClockCenterSize.DEFAULT.name, KEY_CENTER_SIZE)
 }

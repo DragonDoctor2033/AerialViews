@@ -6,9 +6,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.constraintlayout.helper.widget.Flow
+import androidx.constraintlayout.widget.ConstraintLayout
 import com.neilturner.aerialviews.R
 import com.neilturner.aerialviews.databinding.OverlayViewBinding
 import com.neilturner.aerialviews.models.OverlayIds
+import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.enums.OverlayType
@@ -33,6 +35,11 @@ class OverlayHelper(
 ) {
     var overlays = mutableListOf<View?>()
     var isHidden = false
+
+    // The one big analog clock in the middle of the screen, if it is turned on. It is not in a
+    // slot, so it is kept apart from the list of overlays, which is indexed by slot
+    var centerClock: AnalogClockOverlay? = null
+        private set
 
     inline fun <reified T : View> findOverlay(): List<T> = overlays.filterIsInstance<T>()
 
@@ -70,15 +77,18 @@ class OverlayHelper(
 
     fun getTopRightOverlays(): List<View> = listOfNotNull(overlays.getOrNull(6), overlays.getOrNull(7))
 
-    fun getOverlaysToFade(): List<View> {
-        val result = mutableListOf<View>()
-        val fadeCornersSelection = prefs.overlayFadeCornersSelection
-        if (fadeCornersSelection.contains("BOTTOM_LEFT")) result.addAll(getBottomLeftOverlays())
-        if (fadeCornersSelection.contains("BOTTOM_RIGHT")) result.addAll(getBottomRightOverlays())
-        if (fadeCornersSelection.contains("TOP_LEFT")) result.addAll(getTopLeftOverlays())
-        if (fadeCornersSelection.contains("TOP_RIGHT")) result.addAll(getTopRightOverlays())
-        return result
-    }
+    // The overlays which ScreenController fades in and out for the auto-hide settings. The big
+    // clock in the center is part of them, so it fades, hides and comes back together with the
+    // others. Blackout needs nothing, as it hides the whole overlay layout, the clock included.
+    fun getOverlaysToFade(): List<View> =
+        OverlayFadeSelection.overlaysToFade(
+            fadeCorners = prefs.overlayFadeCornersSelection,
+            bottomLeft = getBottomLeftOverlays(),
+            bottomRight = getBottomRightOverlays(),
+            topLeft = getTopLeftOverlays(),
+            topRight = getTopRightOverlays(),
+            center = centerClock,
+        )
 
     // Check if any top overlays should fade (based on user's fade corners selection)
     fun hasTopOverlaysToFade(): Boolean {
@@ -200,6 +210,8 @@ class OverlayHelper(
             }
         }
 
+        addCenterClock(root, visibleAlpha)
+
         // For each overlay loaded, update its prefs
         findOverlay<ClockOverlay>().forEach {
             it.updateFormat(prefs.clockFormat, ClockPrefs.showSeconds)
@@ -249,6 +261,49 @@ class OverlayHelper(
             )
 
         return OverlayIds(bottomRow.first, bottomRow.second, topRow.first, topRow.second)
+    }
+
+    // One big analog clock in the middle of the screen, when it is turned on. It does not use a
+    // slot, so an analog clock in a slot is still shown as well. It is not one of the overlays in
+    // the list, which is indexed by slot, but it is in getOverlaysToFade(), so ScreenController
+    // fades it with the others, and it starts at the same alpha as the overlays which never fade.
+    private fun addCenterClock(
+        root: OverlayViewBinding,
+        visibleAlpha: Float,
+    ) {
+        centerClock = null
+        if (!AnalogClockPrefs.showInCenter) return
+
+        val metrics = context.resources.displayMetrics
+        val clock =
+            AnalogClockOverlay(context).apply {
+                alpha = visibleAlpha
+                configure(
+                    faceDiameterPx =
+                        AnalogClockGeometry.centerDiameterPx(
+                            AnalogClockCenterSize.fromValue(AnalogClockPrefs.centerSize),
+                            metrics.heightPixels,
+                            metrics.widthPixels,
+                        ),
+                    showSecondHand = AnalogClockPrefs.showSecondHand,
+                    colour = ColourHelper.overlayColour(prefs.overlayColour),
+                    halo = AnalogClockHalo.fromValue(AnalogClockPrefs.halo),
+                    burnInDrift = true,
+                )
+            }
+
+        // Tied to all four sides of the layout, which puts it in the middle
+        val params =
+            ConstraintLayout
+                .LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply {
+                    startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    topToTop = ConstraintLayout.LayoutParams.PARENT_ID
+                    bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+                }
+        root.layout.addView(clock, params)
+        centerClock = clock
     }
 
     // Figure out which IDs go where, add an empty view if needed

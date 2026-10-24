@@ -45,6 +45,26 @@
     </string-array>
     <string name="analog_clock_halo_default" translatable="false">MEDIUM</string>
 
+    <!-- Main / Settings / Overlays / Analog clock / Center of the screen -->
+    <string name="category_analog_clock_center">Center of the screen</string>
+    <string name="analog_clock_show_in_center_title">Show in the center of the screen</string>
+    <string name="analog_clock_show_in_center_summary">One big clock in the middle of the screen, as well as any analog clock in a slot. It shifts a few pixels every minute to protect the screen from burn-in</string>
+    <string name="analog_clock_center_size_title">Size of the center clock</string>
+    <string name="analog_clock_center_size_medium">Medium (35% of the screen height)</string>
+    <string name="analog_clock_center_size_large">Large (45% of the screen height)*</string>
+    <string name="analog_clock_center_size_extra_large">Extra large (55% of the screen height)</string>
+    <string-array name="analog_clock_center_size_entries" translatable="false">
+        <item>@string/analog_clock_center_size_medium</item>
+        <item>@string/analog_clock_center_size_large</item>
+        <item>@string/analog_clock_center_size_extra_large</item>
+    </string-array>
+    <string-array name="analog_clock_center_size_values" translatable="false">
+        <item>MEDIUM</item>
+        <item>LARGE</item>
+        <item>EXTRA_LARGE</item>
+    </string-array>
+    <string name="analog_clock_center_size_default" translatable="false">LARGE</string>
+
     <!-- Slots, listed by the slot_entries array in arrays.xml -->
     <string name="slot_analog_clock">Analog clock</string>
 </resources>
