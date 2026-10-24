@@ -76,6 +76,16 @@
                     app:title="@string/weather_videos_match_title" />
 
                 <ListPreference
+                    app:defaultValue="@string/weather_videos_recheck_default"
+                    app:dependency="playlist_weather_match"
+                    app:entries="@array/weather_videos_recheck_entries"
+                    app:entryValues="@array/weather_videos_recheck_values"
+                    app:key="weather_videos_recheck_minutes"
+                    app:title="@string/weather_videos_recheck_title"
+                    app:useSimpleSummaryProvider="true"
+                    app:dialogTitle="@string/weather_videos_recheck_title" />
+
+                <ListPreference
                     app:defaultValue="@string/weather_videos_override_default"
                     app:dependency="playlist_weather_match"
                     app:entries="@array/weather_videos_override_entries"
