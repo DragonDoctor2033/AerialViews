@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <string name="appearance_weather_effects_summary">Дождь, снег, туман и молнии поверх видео в соответствии с погодой на улице</string>
+  <string name="appearance_weather_effects_title">Погодные эффекты</string>
+  <string name="category_weather_effects">Погодные эффекты</string>
+  <string name="weather_effects_enabled_summary">Рисовать дождь, снег, туман, молнии и серый пасмурный оттенок поверх видео в соответствии с текущей погодой. Используется местоположение, заданное в разделе «Погода». Чтобы опробовать эффекты, выберите погоду в пункте «Подмена погоды (для тестирования)» раздела «Плейлист». Пока параметр выключен, ничего не рисуется и погода не запрашивается</string>
+  <string name="weather_effects_enabled_title">Показывать погодные эффекты</string>
+  <string name="weather_effects_frame_rate_30">30 кадров в секунду (легче для устройства)</string>
+  <string name="weather_effects_frame_rate_60">60 кадров в секунду*</string>
+  <string name="weather_effects_frame_rate_title">Частота кадров</string>
+  <string name="weather_effects_intensity_normal">Обычная*</string>
+  <string name="weather_effects_intensity_strong">Сильная</string>
+  <string name="weather_effects_intensity_subtle">Слабая</string>
+  <string name="weather_effects_intensity_title">Интенсивность</string>
+  <string name="weather_effects_skip_summary">Скрывать эффекты, пока идёт видео с пометкой о погоде, например с дождём: оно уже показывает эту погоду. Пометки задаются в разделе «Подбор по погоде» настроек плейлиста</string>
+  <string name="weather_effects_skip_title">Не показывать на видео с погодой</string>
+</resources>

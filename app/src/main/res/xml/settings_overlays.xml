@@ -39,6 +39,11 @@
                     app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysWeatherFragment"/>
 
                 <Preference
+                    app:title="@string/appearance_weather_effects_title"
+                    app:summary="@string/appearance_weather_effects_summary"
+                    app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysWeatherEffectsFragment"/>
+
+                <Preference
                     app:title="@string/appearance_music_title"
                     app:summary="@string/appearance_music_summary"
                     app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysNowPlayingFragment"/>

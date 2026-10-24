@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation" tools:locale="en">
+
+    <!-- Everything for the weather effects lives in this file -->
+
+    <!-- Main / Settings / Overlays -->
+    <string name="appearance_weather_effects_title">Weather effects</string>
+    <string name="appearance_weather_effects_summary">Rain, snow, fog and lightning over the video, to match the weather outside</string>
+
+    <!-- Main / Settings / Overlays / Weather effects -->
+    <string name="category_weather_effects">Weather effects</string>
+    <string name="weather_effects_enabled_title">Show weather effects</string>
+    <string name="weather_effects_enabled_summary">Draw rain, snow, fog, lightning and a grey overcast tone over the video, following the current weather. Uses the location set under Weather. To try them out, pick a weather with Weather override (testing) under Playlist. Nothing is drawn or looked up while this is off</string>
+    <string name="weather_effects_intensity_title">Intensity</string>
+    <string name="weather_effects_intensity_subtle">Subtle</string>
+    <string name="weather_effects_intensity_normal">Normal*</string>
+    <string name="weather_effects_intensity_strong">Strong</string>
+    <string-array name="weather_effects_intensity_entries" translatable="false">
+        <item>@string/weather_effects_intensity_subtle</item>
+        <item>@string/weather_effects_intensity_normal</item>
+        <item>@string/weather_effects_intensity_strong</item>
+    </string-array>
+    <string-array name="weather_effects_intensity_values" translatable="false">
+        <item>SUBTLE</item>
+        <item>NORMAL</item>
+        <item>STRONG</item>
+    </string-array>
+    <string name="weather_effects_intensity_default" translatable="false">NORMAL</string>
+    <string name="weather_effects_skip_title">Skip on weather clips</string>
+    <string name="weather_effects_skip_summary">Hide the effects while a video tagged with weather, such as rain, is playing, as it already shows that weather. The tags are set under Weather matching in the Playlist settings</string>
+    <string name="weather_effects_frame_rate_title">Frame rate</string>
+    <string name="weather_effects_frame_rate_60">60 frames per second*</string>
+    <string name="weather_effects_frame_rate_30">30 frames per second (lighter)</string>
+    <string-array name="weather_effects_frame_rate_entries" translatable="false">
+        <item>@string/weather_effects_frame_rate_60</item>
+        <item>@string/weather_effects_frame_rate_30</item>
+    </string-array>
+    <string-array name="weather_effects_frame_rate_values" translatable="false">
+        <item>FPS_60</item>
+        <item>FPS_30</item>
+    </string-array>
+    <string name="weather_effects_frame_rate_default" translatable="false">FPS_60</string>
+</resources>
