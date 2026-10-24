@@ -122,12 +122,17 @@ class WeatherEffectsView
         private val fogPaints = Array(FogLayers.COUNT) { Paint().apply { isFilterBitmap = true } }
 
         // The veil is a gradient of white, denser towards the bottom, which is given its colour by a
-        // colour filter (light grey by day, darker by night) and its opacity by the alpha of the paint
-        private val veilPaint = Paint().apply { colorFilter = LightingColorFilter(EffectPalette.veil(0f, 1f), 0) }
+        // colour filter (light grey by day, darker by night) and its opacity by the alpha of the paint.
+        // Both gradients are dithered, as a faint gradient over a whole screen shows bands otherwise
+        private val veilPaint =
+            Paint().apply {
+                isDither = true
+                colorFilter = LightingColorFilter(EffectPalette.veil(0f, 1f), 0)
+            }
 
         // A flash is a gradient of the colour of the flash, from all of it at the top to a share of it
         // at the bottom, and the alpha of the paint is how bright the flash is at the moment
-        private val flashPaint = Paint()
+        private val flashPaint = Paint().apply { isDither = true }
         private val spriteRect = RectF()
 
         // On every frame, while something moves. The callback is posted again by every frame, so it
