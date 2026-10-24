@@ -5,20 +5,86 @@ import timber.log.Timber
 import java.util.Locale
 
 object WeatherLanguage {
-    // Gets the language code for Open-Meteo place names based on device locale. The geocoding API
-    // takes lower-case ISO 639-1 codes and falls back to English or the native name on its own
-    fun getLanguageCode(context: Context): String {
-        val langCode = getDeviceLocale(context).language.lowercase()
-        Timber.i("Weather: device language: $langCode")
+    // List of language codes supported by OpenWeather API
+    // https://openweathermap.org/current#multi
+    private val supportedLanguages =
+        setOf(
+            "af", // Afrikaans
+            "al", // Albanian
+            "ar", // Arabic
+            "az", // Azerbaijani
+            "bg", // Bulgarian
+            "ca", // Catalan
+            "cz", // Czech
+            "da", // Danish
+            "de", // German
+            "el", // Greek
+            "en", // English
+            "eu", // Basque
+            "fa", // Persian (Farsi)
+            "fi", // Finnish
+            "fr", // French
+            "gl", // Galician
+            "he", // Hebrew
+            "hi", // Hindi
+            "hr", // Croatian
+            "hu", // Hungarian
+            "id", // Indonesian
+            "it", // Italian
+            "ja", // Japanese
+            "kr", // Korean
+            "la", // Latvian
+            "lt", // Lithuanian
+            "mk", // Macedonian
+            "no", // Norwegian
+            "nl", // Dutch
+            "pl", // Polish
+            "pt", // Portuguese
+            "pt_br", // Português Brasil
+            "ro", // Romanian
+            "ru", // Russian
+            "sv", // Swedish
+            "sk", // Slovak
+            "sl", // Slovenian
+            "sp", // Spanish
+            "es", // Spanish (alternative)
+            "sr", // Serbian
+            "th", // Thai
+            "tr", // Turkish
+            "ua", // Ukrainian
+            "uk", // Ukrainian (alternative)
+            "vi", // Vietnamese
+            "zh_cn", // Chinese Simplified
+            "zh_tw", // Chinese Traditional
+            "zu", // Zulu
+        )
 
-        // Older Java versions still report the legacy codes for these languages
-        return when (langCode) {
-            "iw" -> "he"
-            "in" -> "id"
-            "ji" -> "yi"
-            "" -> "en"
-            else -> langCode
+    // Gets the appropriate language code for the OpenWeather API based on device locale
+    // Returns English (en) if the device language is not supported
+    fun getLanguageCode(context: Context): String {
+        val deviceLocale = getDeviceLocale(context)
+        val langCode = deviceLocale.language.lowercase()
+        val countryCode = deviceLocale.country.lowercase()
+
+        // Check for special cases with country-specific variants
+        when (langCode) {
+            "zh" if countryCode == "cn" -> return "zh_cn"
+
+            "zh" if countryCode == "tw" -> return "zh_tw"
+
+            "pt" if countryCode == "br" -> return "pt_br"
+
+            "iw" -> return "he"
+
+            "es" -> return "es"
+
+            // Use he instead of iw
+            "uk" -> return "uk" // Use uk instead of ua
         }
+
+        // Return the language code if supported, or English as fallback
+        Timber.i("Weather: device language: $langCode, Country: $countryCode")
+        return if (supportedLanguages.contains(langCode)) langCode else "en"
     }
 
     // Get the current device locale

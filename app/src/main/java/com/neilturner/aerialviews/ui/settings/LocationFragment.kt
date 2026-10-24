@@ -148,17 +148,58 @@ class LocationFragment : MenuStateFragment() {
         lat: Double,
         lon: Double,
     ) {
-        // Open-Meteo has no reverse geocoding, so coordinates become a custom location as they are.
-        // The custom name setting gives it a proper name in the overlays
-        val coordinateLocation =
-            LocationResponse(
-                name = getString(R.string.location_custom_name_default),
-                lat = lat,
-                lon = lon,
-                country = "",
-                state = null,
+        val loadingMessage = getString(R.string.location_lookup_coordinates)
+        val progressDialog =
+            DialogHelper.progressDialog(
+                requireContext(),
+                loadingMessage,
             )
-        showLocationSelectionDialog(listOf(coordinateLocation))
+        progressDialog.show()
+
+        lifecycleScope.launch {
+            try {
+                val locations =
+                    withContext(Dispatchers.IO) {
+                        weatherService.lookupLocationByCoordinates(lat, lon)
+                    }
+
+                progressDialog.dismiss()
+
+                if (locations.isEmpty()) {
+                    // If no location found via API, create a custom location with coordinates
+                    val coordinateLocation =
+                        LocationResponse(
+                            name = getString(R.string.location_custom_name_default),
+                            lat = lat,
+                            lon = lon,
+                            country = "",
+                            state = null,
+                        )
+                    showLocationSelectionDialog(listOf(coordinateLocation))
+                } else {
+                    // Update the coordinates in the API results to match the exact input
+                    val updatedLocations =
+                        locations.map { location ->
+                            location.copy(lat = lat, lon = lon)
+                        }
+                    showLocationSelectionDialog(updatedLocations)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to lookup location by coordinates")
+                progressDialog.dismiss()
+
+                // Fallback: create a custom location if API fails
+                val coordinateLocation =
+                    LocationResponse(
+                        name = getString(R.string.location_custom_name_default),
+                        lat = lat,
+                        lon = lon,
+                        country = "",
+                        state = null,
+                    )
+                showLocationSelectionDialog(listOf(coordinateLocation))
+            }
+        }
     }
 
     private fun showLocationSelectionDialog(locations: List<LocationResponse>) {
