@@ -1,5 +1,6 @@
 package com.neilturner.aerialviews.ui.overlays.utils
 
+import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -294,6 +295,78 @@ internal class AnalogClockGeometryTest {
     fun `a face with no size has no view, even with a halo`() {
         assertEquals(0, AnalogClockGeometry.viewSizePx(0, AnalogClockHalo.STRONG))
         assertEquals(0, AnalogClockGeometry.viewSizePx(-20, AnalogClockHalo.STRONG))
+    }
+
+    @Test
+    fun `the clock in the center is 35, 45 or 55 percent of the screen height on a 1080p TV`() {
+        assertEquals(378, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.MEDIUM, 1080, 1920))
+        assertEquals(486, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 1080, 1920))
+        assertEquals(594, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1080, 1920))
+    }
+
+    @Test
+    fun `the clock in the center scales with the height of the screen`() {
+        // 720p, and a TV which lays out its screen at 4K
+        assertEquals(252, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.MEDIUM, 720, 1280))
+        assertEquals(324, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 720, 1280))
+        assertEquals(396, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 720, 1280))
+        assertEquals(756, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.MEDIUM, 2160, 3840))
+        assertEquals(972, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 2160, 3840))
+        assertEquals(1188, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 2160, 3840))
+    }
+
+    @Test
+    fun `the diameter in the center is rounded to whole pixels`() {
+        // 35 percent of 1001 is 350.35, 45 percent of 1001 is 450.45 and 55 percent is 550.55
+        assertEquals(350, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.MEDIUM, 1001, 1920))
+        assertEquals(450, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 1001, 1920))
+        assertEquals(551, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1001, 1920))
+    }
+
+    @Test
+    fun `bigger sizes in the center are bigger, and all are bigger than any clock in a slot`() {
+        val largestSlotClock = AnalogClockGeometry.diameterPx(AnalogClockSize.LARGE, 2f)
+        val diameters = AnalogClockCenterSize.entries.map { AnalogClockGeometry.centerDiameterPx(it, 1080, 1920) }
+
+        assertEquals(diameters.sorted(), diameters)
+        assertEquals(diameters.distinct(), diameters)
+        assertTrue(diameters.all { it > largestSlotClock }, "$diameters against $largestSlotClock")
+    }
+
+    @Test
+    fun `a screen with no usable height is taken to be a 1080p TV`() {
+        listOf(0, -1, -1080).forEach { height ->
+            assertEquals(486, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, height, 1920), "height $height")
+        }
+    }
+
+    @Test
+    fun `the clock in the center is not held back on a wide screen, or when the width is not known`() {
+        assertEquals(594, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1080, 1920))
+        assertEquals(594, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1080, 0))
+        assertEquals(594, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1080, -1))
+    }
+
+    @Test
+    fun `the clock in the center of an upright screen is held to 70 percent of the width`() {
+        // A phone, 1080 x 2400: 45 percent of the height would be as wide as the whole screen
+        assertEquals(756, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 2400, 1080))
+        assertEquals(756, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 2400, 1080))
+        // 35 percent of 2400 is 840, which is more than 70 percent of 1080 too
+        assertEquals(756, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.MEDIUM, 2400, 1080))
+        // A tablet which is nearly square has room for it
+        assertEquals(486, AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.LARGE, 1080, 1200))
+    }
+
+    @Test
+    fun `the biggest clock in the center still fits on the screen with its halo`() {
+        val face = AnalogClockGeometry.centerDiameterPx(AnalogClockCenterSize.EXTRA_LARGE, 1080, 1920)
+
+        AnalogClockHalo.entries.forEach { halo ->
+            assertTrue(AnalogClockGeometry.viewSizePx(face, halo) <= 1080, "$halo")
+        }
+        // Even drifting 8 dp, 16 px, in any direction
+        assertTrue(AnalogClockGeometry.viewSizePx(face, AnalogClockHalo.STRONG) + 2 * 16 <= 1080)
     }
 
     private companion object {
