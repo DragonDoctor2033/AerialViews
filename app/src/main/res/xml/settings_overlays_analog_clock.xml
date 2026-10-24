@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+        <PreferenceCategory app:title="@string/category_analog_clock">
+                <ListPreference
+                    app:defaultValue="@string/analog_clock_size_default"
+                    app:entries="@array/analog_clock_size_entries"
+                    app:entryValues="@array/analog_clock_size_values"
+                    app:key="analog_clock_size"
+                    app:title="@string/analog_clock_size_title"
+                    app:useSimpleSummaryProvider="true" />
+
+                <CheckBoxPreference
+                    app:defaultValue="true"
+                    app:key="analog_clock_show_second_hand"
+                    app:summary="@string/analog_clock_show_second_hand_summary"
+                    app:title="@string/analog_clock_show_second_hand_title" />
+        </PreferenceCategory>
+</PreferenceScreen>

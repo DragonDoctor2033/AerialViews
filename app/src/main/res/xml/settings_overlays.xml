@@ -59,6 +59,11 @@
                     app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysClockFragment"/>
 
                 <Preference
+                    app:title="@string/appearance_analog_clock_title"
+                    app:summary="@string/appearance_analog_clock_summary"
+                    app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysAnalogClockFragment"/>
+
+                <Preference
                     app:title="@string/appearance_countdown_title"
                     app:summary="@string/appearance_countdown_summary"
                     app:fragment="com.neilturner.aerialviews.ui.settings.OverlaysCountdownFragment"/>
