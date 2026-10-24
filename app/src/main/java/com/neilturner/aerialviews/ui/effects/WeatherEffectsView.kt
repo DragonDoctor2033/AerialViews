@@ -392,6 +392,7 @@ class WeatherEffectsView
             // Whatever flash there was when the frames stopped is long over
             flash = 0f
             quality = if (isHardwareAccelerated) 1f else EffectBudget.SOFTWARE_QUALITY
+            Timber.d("WeatherEffects: Drawing up to $fps frames a second, hardware accelerated: $isHardwareAccelerated")
             postNextFrame()
         }
 
