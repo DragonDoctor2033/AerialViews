@@ -354,6 +354,7 @@
     <string-array name="slot_entries" translatable="false">
         <item>@string/slot_empty</item>
         <item>@string/slot_clock</item>
+        <item>@string/slot_analog_clock</item>
         <item>@string/slot_metadata_1</item>
         <item>@string/slot_metadata_2</item>
         <item>@string/slot_metadata_3</item>
@@ -372,6 +373,7 @@
     <string-array name="slot_values" translatable="false">
         <item>EMPTY</item>
         <item>CLOCK</item>
+        <item>ANALOG_CLOCK</item>
         <item>METADATA1</item>
         <item>METADATA2</item>
         <item>METADATA3</item>

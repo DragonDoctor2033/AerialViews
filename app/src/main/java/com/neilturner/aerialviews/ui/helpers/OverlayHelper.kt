@@ -9,9 +9,12 @@ import androidx.constraintlayout.helper.widget.Flow
 import com.neilturner.aerialviews.R
 import com.neilturner.aerialviews.databinding.OverlayViewBinding
 import com.neilturner.aerialviews.models.OverlayIds
+import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.enums.OverlayType
 import com.neilturner.aerialviews.models.enums.SlotType
+import com.neilturner.aerialviews.models.prefs.AnalogClockPrefs
 import com.neilturner.aerialviews.models.prefs.GeneralPrefs
+import com.neilturner.aerialviews.ui.overlays.AnalogClockOverlay
 import com.neilturner.aerialviews.ui.overlays.ClockOverlay
 import com.neilturner.aerialviews.ui.overlays.CountdownOverlay
 import com.neilturner.aerialviews.ui.overlays.DateOverlay
@@ -266,6 +269,16 @@ class OverlayHelper(
             OverlayType.CLOCK -> {
                 ClockOverlay(context).apply {
                     applyFontToTextView(this, prefs.clockSize.toFloat(), prefs.clockWeight)
+                }
+            }
+
+            OverlayType.ANALOG_CLOCK -> {
+                AnalogClockOverlay(context).apply {
+                    configure(
+                        size = AnalogClockSize.fromValue(AnalogClockPrefs.size),
+                        showSecondHand = AnalogClockPrefs.showSecondHand,
+                        colour = ColourHelper.overlayColour(prefs.overlayColour),
+                    )
                 }
             }
 

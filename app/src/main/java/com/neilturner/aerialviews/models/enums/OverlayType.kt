@@ -3,6 +3,7 @@ package com.neilturner.aerialviews.models.enums
 enum class OverlayType {
     EMPTY,
     CLOCK,
+    ANALOG_CLOCK,
     METADATA1,
     METADATA2,
     METADATA3,

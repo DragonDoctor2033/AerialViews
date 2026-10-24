@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation" tools:locale="en">
+
+    <!-- Everything for the analog clock overlay lives in this file -->
+
+    <!-- Main / Settings / Overlays -->
+    <string name="appearance_analog_clock_title">Analog clock</string>
+    <string name="appearance_analog_clock_summary">Display the current time on a clock face</string>
+
+    <!-- Main / Settings / Overlays / Analog clock -->
+    <string name="category_analog_clock">Analog clock</string>
+    <string name="analog_clock_size_title">Size</string>
+    <string name="analog_clock_size_small">Small</string>
+    <string name="analog_clock_size_medium">Medium*</string>
+    <string name="analog_clock_size_large">Large</string>
+    <string-array name="analog_clock_size_entries" translatable="false">
+        <item>@string/analog_clock_size_small</item>
+        <item>@string/analog_clock_size_medium</item>
+        <item>@string/analog_clock_size_large</item>
+    </string-array>
+    <string-array name="analog_clock_size_values" translatable="false">
+        <item>SMALL</item>
+        <item>MEDIUM</item>
+        <item>LARGE</item>
+    </string-array>
+    <string name="analog_clock_size_default" translatable="false">MEDIUM</string>
+    <string name="analog_clock_show_second_hand_title">Show second hand</string>
+    <string name="analog_clock_show_second_hand_summary">A thin red hand that moves once a second</string>
+
+    <!-- Slots, listed by the slot_entries array in arrays.xml -->
+    <string name="slot_analog_clock">Analog clock</string>
+</resources>

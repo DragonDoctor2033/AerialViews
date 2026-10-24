@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+  <string name="analog_clock_show_second_hand_summary">Тонкая красная стрелка, которая двигается раз в секунду</string>
+  <string name="analog_clock_show_second_hand_title">Показывать секундную стрелку</string>
+  <string name="analog_clock_size_large">Большой</string>
+  <string name="analog_clock_size_medium">Средний*</string>
+  <string name="analog_clock_size_small">Маленький</string>
+  <string name="analog_clock_size_title">Размер</string>
+  <string name="appearance_analog_clock_summary">Отображение текущего времени на циферблате со стрелками</string>
+  <string name="appearance_analog_clock_title">Аналоговые часы</string>
+  <string name="category_analog_clock">Аналоговые часы</string>
+  <string name="slot_analog_clock">Аналоговые часы</string>
+</resources>
