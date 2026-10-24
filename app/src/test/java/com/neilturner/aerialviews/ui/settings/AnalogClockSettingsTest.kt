@@ -2,6 +2,7 @@ package com.neilturner.aerialviews.ui.settings
 
 import com.neilturner.aerialviews.models.enums.AnalogClockCenterSize
 import com.neilturner.aerialviews.models.enums.AnalogClockHalo
+import com.neilturner.aerialviews.models.enums.AnalogClockSecondHandMotion
 import com.neilturner.aerialviews.models.enums.AnalogClockSize
 import com.neilturner.aerialviews.models.prefs.AnalogClockPrefs
 import com.neilturner.aerialviews.testutils.ResourceXml
@@ -30,6 +31,7 @@ internal class AnalogClockSettingsTest {
             listOf(
                 AnalogClockPrefs.KEY_SIZE,
                 AnalogClockPrefs.KEY_SHOW_SECOND_HAND,
+                AnalogClockPrefs.KEY_SECOND_HAND_MOTION,
                 AnalogClockPrefs.KEY_HALO,
                 AnalogClockPrefs.KEY_SHOW_IN_CENTER,
                 AnalogClockPrefs.KEY_CENTER_SIZE,
@@ -38,6 +40,7 @@ internal class AnalogClockSettingsTest {
         )
         assertEquals("analog_clock_size", AnalogClockPrefs.KEY_SIZE)
         assertEquals("analog_clock_show_second_hand", AnalogClockPrefs.KEY_SHOW_SECOND_HAND)
+        assertEquals("analog_clock_second_hand_motion", AnalogClockPrefs.KEY_SECOND_HAND_MOTION)
         assertEquals("analog_clock_halo", AnalogClockPrefs.KEY_HALO)
         assertEquals("analog_clock_show_in_center", AnalogClockPrefs.KEY_SHOW_IN_CENTER)
         assertEquals("analog_clock_center_size", AnalogClockPrefs.KEY_CENTER_SIZE)
@@ -74,6 +77,74 @@ internal class AnalogClockSettingsTest {
         assertEquals("CheckBoxPreference", secondHand.tagName)
         assertEquals("true", secondHand.getAttribute("app:defaultValue"))
         assertEquals("@string/analog_clock_show_second_hand_title", secondHand.getAttribute("app:title"))
+    }
+
+    @Test
+    fun `second hand motion is a dropdown of smooth sweep and tick`() {
+        val motion = ResourceXml.preference(screen, AnalogClockPrefs.KEY_SECOND_HAND_MOTION)
+        assertEquals("ListPreference", motion.tagName)
+        assertEquals("@array/analog_clock_second_hand_motion_entries", motion.getAttribute("app:entries"))
+        assertEquals("@array/analog_clock_second_hand_motion_values", motion.getAttribute("app:entryValues"))
+        assertEquals("@string/analog_clock_second_hand_motion_title", motion.getAttribute("app:title"))
+        assertEquals("true", motion.getAttribute("app:useSimpleSummaryProvider"))
+
+        val values = ResourceXml.stringArray(strings, "analog_clock_second_hand_motion_values")
+        val entries = ResourceXml.stringArray(strings, "analog_clock_second_hand_motion_entries")
+        assertEquals(listOf("SMOOTH", "TICK"), values)
+        assertEquals(AnalogClockSecondHandMotion.entries.map { it.name }, values)
+        assertEquals(values.size, entries.size)
+        assertEquals("Second hand motion", ResourceXml.strings(strings).getValue("analog_clock_second_hand_motion_title"))
+    }
+
+    @Test
+    fun `second hand motion is a smooth sweep by default`() {
+        val motion = ResourceXml.preference(screen, AnalogClockPrefs.KEY_SECOND_HAND_MOTION)
+        val default = ResourceXml.strings(strings).getValue("analog_clock_second_hand_motion_default")
+
+        assertEquals("@string/analog_clock_second_hand_motion_default", motion.getAttribute("app:defaultValue"))
+        assertEquals("SMOOTH", default)
+        assertEquals(AnalogClockSecondHandMotion.DEFAULT.name, default)
+    }
+
+    @Test
+    fun `only the default motion is marked with a star`() {
+        val values = ResourceXml.stringArray(strings, "analog_clock_second_hand_motion_values")
+        val entries = ResourceXml.stringArray(strings, "analog_clock_second_hand_motion_entries").map { it.removePrefix("@string/") }
+
+        listOf(ResourceXml.strings(strings), ResourceXml.strings(russianStrings)).forEach { texts ->
+            values.forEachIndexed { index, value ->
+                val marked = texts.getValue(entries[index]).endsWith("*")
+                assertEquals(value == AnalogClockSecondHandMotion.DEFAULT.name, marked, "'${entries[index]}' ($value)")
+            }
+        }
+    }
+
+    @Test
+    fun `second hand motion only matters, and is only enabled, when the second hand is shown`() {
+        val motion = ResourceXml.preference(screen, AnalogClockPrefs.KEY_SECOND_HAND_MOTION)
+
+        assertEquals(AnalogClockPrefs.KEY_SHOW_SECOND_HAND, motion.getAttribute("app:dependency"))
+    }
+
+    @Test
+    fun `second hand motion sits right under the second hand checkbox`() {
+        val keys = ResourceXml.elementsWithAttribute(screen, "app:key").map { it.getAttribute("app:key") }
+
+        assertEquals(
+            keys.indexOf(AnalogClockPrefs.KEY_SHOW_SECOND_HAND) + 1,
+            keys.indexOf(AnalogClockPrefs.KEY_SECOND_HAND_MOTION),
+        )
+    }
+
+    @Test
+    fun `the preference stores the motion by name and defaults to the smooth sweep`() {
+        val prefs = mainSource("com/neilturner/aerialviews/models/prefs/AnalogClockPrefs.kt")
+
+        assertTrue(prefs.isNotEmpty(), "No source file for AnalogClockPrefs")
+        assertTrue(
+            "var secondHandMotion by stringPref(AnalogClockSecondHandMotion.DEFAULT.name, KEY_SECOND_HAND_MOTION)" in prefs,
+            "secondHandMotion is not declared with the default motion and its key",
+        )
     }
 
     @Test
@@ -194,14 +265,9 @@ internal class AnalogClockSettingsTest {
 
     @Test
     fun `the screen is a fragment which loads the analog clock preferences`() {
-        val relativePath = fragmentClass.replace('.', '/') + ".kt"
-        val source =
-            listOf("src/main/java/$relativePath", "app/src/main/java/$relativePath")
-                .map { File(it) }
-                .firstOrNull { it.exists() }
+        val code = mainSource(fragmentClass.replace('.', '/') + ".kt")
 
-        assertNotNull(source, "No source file for $fragmentClass")
-        val code = source?.readText().orEmpty()
+        assertTrue(code.isNotEmpty(), "No source file for $fragmentClass")
         assertTrue("class OverlaysAnalogClockFragment" in code)
         assertTrue("R.xml.settings_overlays_analog_clock" in code)
     }
@@ -211,8 +277,12 @@ internal class AnalogClockSettingsTest {
         val defined = ResourceXml.defaultStringNames()
         val used = stringReferences(screen) + stringReferences(overlaysScreen).filter { "analog" in it }
         val listed =
-            listOf("analog_clock_size_entries", "analog_clock_halo_entries", "analog_clock_center_size_entries")
-                .flatMap { ResourceXml.stringArray(strings, it) }
+            listOf(
+                "analog_clock_size_entries",
+                "analog_clock_second_hand_motion_entries",
+                "analog_clock_halo_entries",
+                "analog_clock_center_size_entries",
+            ).flatMap { ResourceXml.stringArray(strings, it) }
                 .map { it.removePrefix("@string/") }
 
         assertTrue(used.isNotEmpty())
@@ -241,6 +311,15 @@ internal class AnalogClockSettingsTest {
         assertTrue("slot_analog_clock" in ResourceXml.translatableStringNames(strings))
         assertTrue("slot_analog_clock" in ResourceXml.strings(russianStrings))
     }
+
+    // A source file under src/main/java, as text, or empty when there is no such file. Gradle runs
+    // unit tests with the app module as the working directory
+    private fun mainSource(relativePath: String): String =
+        listOf("src/main/java/$relativePath", "app/src/main/java/$relativePath")
+            .map { File(it) }
+            .firstOrNull { it.exists() }
+            ?.readText()
+            .orEmpty()
 
     // Names of the strings used by title, summary and default value attributes
     private fun stringReferences(path: String): Set<String> =

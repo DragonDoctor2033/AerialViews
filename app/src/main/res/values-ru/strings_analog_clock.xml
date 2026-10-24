@@ -9,9 +9,12 @@
   <string name="analog_clock_halo_off">Выкл.</string>
   <string name="analog_clock_halo_strong">Сильный</string>
   <string name="analog_clock_halo_title">Ореол за часами</string>
+  <string name="analog_clock_second_hand_motion_smooth">Плавный ход*</string>
+  <string name="analog_clock_second_hand_motion_tick">Шаговый ход (раз в секунду)</string>
+  <string name="analog_clock_second_hand_motion_title">Движение секундной стрелки</string>
   <string name="analog_clock_show_in_center_summary">Одни большие часы посередине экрана, независимо от аналоговых часов в углах. Раз в минуту они смещаются на несколько пикселей, чтобы экран не выгорал</string>
   <string name="analog_clock_show_in_center_title">Показывать в центре экрана</string>
-  <string name="analog_clock_show_second_hand_summary">Тонкая красная стрелка, которая двигается раз в секунду</string>
+  <string name="analog_clock_show_second_hand_summary">Тонкая красная стрелка, показывающая секунды</string>
   <string name="analog_clock_show_second_hand_title">Показывать секундную стрелку</string>
   <string name="analog_clock_size_large">Большой</string>
   <string name="analog_clock_size_medium">Средний*</string>

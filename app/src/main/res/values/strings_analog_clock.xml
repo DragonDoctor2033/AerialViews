@@ -25,7 +25,19 @@
     </string-array>
     <string name="analog_clock_size_default" translatable="false">MEDIUM</string>
     <string name="analog_clock_show_second_hand_title">Show second hand</string>
-    <string name="analog_clock_show_second_hand_summary">A thin red hand that moves once a second</string>
+    <string name="analog_clock_show_second_hand_summary">A thin red hand showing the seconds</string>
+    <string name="analog_clock_second_hand_motion_title">Second hand motion</string>
+    <string name="analog_clock_second_hand_motion_smooth">Smooth sweep*</string>
+    <string name="analog_clock_second_hand_motion_tick">Tick (once a second)</string>
+    <string-array name="analog_clock_second_hand_motion_entries" translatable="false">
+        <item>@string/analog_clock_second_hand_motion_smooth</item>
+        <item>@string/analog_clock_second_hand_motion_tick</item>
+    </string-array>
+    <string-array name="analog_clock_second_hand_motion_values" translatable="false">
+        <item>SMOOTH</item>
+        <item>TICK</item>
+    </string-array>
+    <string name="analog_clock_second_hand_motion_default" translatable="false">SMOOTH</string>
     <string name="analog_clock_halo_title">Background halo</string>
     <string name="analog_clock_halo_off">Off</string>
     <string name="analog_clock_halo_light">Light</string>

@@ -18,6 +18,15 @@
                     app:title="@string/analog_clock_show_second_hand_title" />
 
                 <ListPreference
+                    app:defaultValue="@string/analog_clock_second_hand_motion_default"
+                    app:dependency="analog_clock_show_second_hand"
+                    app:entries="@array/analog_clock_second_hand_motion_entries"
+                    app:entryValues="@array/analog_clock_second_hand_motion_values"
+                    app:key="analog_clock_second_hand_motion"
+                    app:title="@string/analog_clock_second_hand_motion_title"
+                    app:useSimpleSummaryProvider="true" />
+
+                <ListPreference
                     app:defaultValue="@string/analog_clock_halo_default"
                     app:entries="@array/analog_clock_halo_entries"
                     app:entryValues="@array/analog_clock_halo_values"
